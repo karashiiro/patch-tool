@@ -22,24 +22,8 @@ class ApiStack(Stack):
         aqua_proxy_lambda_integration = apigw.LambdaIntegration(
             aqua_proxy_lambda,  # type: ignore
             proxy=True,
-            integration_responses=[
-                apigw.IntegrationResponse(
-                    status_code='200',
-                    response_parameters={
-                        'method.response.header.Access-Control-Allow-Origin': "'*'"
-                    }
-                )
-            ]
         )
         api_entity.add_method(
             'POST',
             aqua_proxy_lambda_integration,
-            method_responses=[
-                apigw.MethodResponse(
-                    status_code='200',
-                    response_parameters={
-                        'method.response.header.Access-Control-Allow-Origin': True
-                    }
-                )
-            ]
         )

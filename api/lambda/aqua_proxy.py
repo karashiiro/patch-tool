@@ -21,6 +21,10 @@ def extract_headers(res: client.HTTPResponse) -> Dict[str, str]:
     return dict(res.getheaders())
 
 
+def cors_permissive(headers: Dict[str, str]) -> Dict[str, str]:
+    return {**headers, **{'Access-Control-Allow-Origin': '*'}}
+
+
 def handler(event, context):
     # Process the body data
     body = event['body']
@@ -29,9 +33,9 @@ def handler(event, context):
         logger.error('No URL received in the request body object: %s', body)
         return {
             'statusCode': 400,
-            'headers': {
+            'headers': cors_permissive({
                 'Content-Type': 'application/json',
-            },
+            }),
             'body': json.dumps({
                 'message': 'No URL provided.',
             }),
@@ -44,9 +48,9 @@ def handler(event, context):
             'Invalid URL received in the request body object: %s', body)
         return {
             'statusCode': 400,
-            'headers': {
+            'headers': cors_permissive({
                 'Content-Type': 'application/json',
-            },
+            }),
             'body': json.dumps({
                 'message': 'Invalid URL provided.',
             }),
@@ -58,9 +62,9 @@ def handler(event, context):
             'Invalid URL received in the request body object: %s', body)
         return {
             'statusCode': 400,
-            'headers': {
+            'headers': cors_permissive({
                 'Content-Type': 'application/json',
-            },
+            }),
             'body': json.dumps({
                 'message': 'Invalid URL provided.',
             }),
@@ -80,6 +84,6 @@ def handler(event, context):
 
     return {
         'statusCode': res.status,
-        'headers': extract_headers(res),
+        'headers': cors_permissive(extract_headers(res)),
         'body': body,
     }
