@@ -20,7 +20,7 @@ class ApiStack(Stack):
                 allow_origins=apigw.Cors.ALL_ORIGINS)
         )
         aqua_proxy_lambda_integration = apigw.LambdaIntegration(
-            aqua_proxy_lambda,
+            aqua_proxy_lambda,  # type: ignore
             proxy=True,
             integration_responses=[
                 apigw.IntegrationResponse(
