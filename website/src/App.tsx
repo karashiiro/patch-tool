@@ -31,13 +31,25 @@ function App() {
             <header className="App">
                 <table>
                     <tbody>
-                    {patchData.launcherFiles.map((f) => (
-                        <tr key={f.fingerprint}>
-                            <td>{f.path}</td>
-                            <td>{parseSize(f.size)}</td>
-                            <td>{f.fingerprint}</td>
-                        </tr>
-                    ))}
+                    {patchData.launcherFiles.map((f, i) => {
+                        if (f.type === "D") {
+                            return (
+                                <tr key={i}>
+                                    <td>{f.path}</td>
+                                    <td></td>
+                                    <td></td>
+                                </tr>
+                            );
+                        }
+
+                        return (
+                            <tr key={i}>
+                                <td>{f.value.path}</td>
+                                <td>{parseSize(f.value.size)}</td>
+                                <td>{f.value.fingerprint}</td>
+                            </tr>
+                        );
+                    })}
                     </tbody>
                 </table>
             </header>

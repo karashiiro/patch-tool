@@ -4,22 +4,29 @@ type PatchLocation = "m" | "p";
 
 type PatchFetchStatus = "error" | "not-retrieved" | "updating" | "updated";
 
-interface LauncherPatchFile {
+type FileEntry<F> = { type: "F", value: F };
+
+type DirectoryEntry<F> = { type: "D", path: string, value: Directory<F> };
+
+type Directory<F> = (DirectoryEntry<F> | FileEntry<F>)[];
+
+type FileSystem<F> = Directory<F>;
+
+interface PatchFile {
     path: string;
     size: number;
     fingerprint: string;
 }
 
-interface GamePatchFile {
-    path: string;
-    size: number;
-    fingerprint: string;
+interface LauncherPatchFile extends PatchFile {}
+
+interface GamePatchFile extends PatchFile{
     location: PatchLocation;
 }
 
 interface PatchData {
-    launcherFiles: LauncherPatchFile[];
-    gameFiles: GamePatchFile[];
+    launcherFiles: FileSystem<LauncherPatchFile>;
+    gameFiles: FileSystem<GamePatchFile>;
     repositories: {
         master?: string;
         patch?: string;
@@ -76,36 +83,112 @@ const parseManagementIni = (data: string) => {
         .reduce<Record<string, string>>((agg, next) => ({...agg, [next[0]]: next[1]}), {});
 };
 
-const fetchLauncherPatchFiles = async (patchUrl: string, patchUrlBackup: string) => {
+const expandFile = <F extends PatchFile> (f: FileEntry<F>): [Boolean, Directory<F>] => {
+    const separator = f.value.path.indexOf("/");
+    if (separator === -1) {
+        return [false, [f]];
+    }
+
+    const parentDir = f.value.path.substring(0, separator);
+    const fNew: FileEntry<F> = { type: "F", value: { ...f.value, path: f.value.path.substring(separator + 1)} };
+    const dir: Directory<F> = [{ type: "D", path: parentDir, value: [fNew] }];
+    return [true, dir];
+};
+
+const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>): FileSystem<F> => {
+    // Copy the filesystem since this pushes more entries onto it
+    const fsCopy = fs.slice();
+    const fsClean = fsCopy
+        .map((e, _i, arr) => {
+            // Expand directories recursively
+            if (e.type === "D") {
+                const fs: Directory<F> = [{ type: "D", path: e.path, value: expandFileSystem(e.value) }];
+                return fs;
+            }
+
+            // Expand files into filesystems, and do push the result to do this recursively if needed
+            const [expandMore, dir] = expandFile(e);
+            if (expandMore) {
+                arr.push(...dir);
+            }
+
+            return dir;
+        })
+        .flat()
+        .reduce<{ directories: Record<string, DirectoryEntry<F>>, fs: FileSystem<F> }>((agg, next) => {
+            if (next.type === "F") {
+                // Plain file, just add it
+                agg.fs.push(next);
+            } else {
+                // Only add the directory if it hasn't already been added; otherwise, merge the directory
+                // with the existing one
+                if (next.path in agg.directories) {
+                    agg.directories[next.path].value.push(...next.value);
+                } else {
+                    agg.directories[next.path] = next;
+                    agg.fs.push(next);
+                }
+            }
+
+            return agg;
+        }, { directories: {}, fs: [] });
+    return fsClean.fs;
+};
+
+const sortFileSystem = <F extends PatchFile> (a: DirectoryEntry<F> | FileEntry<F>, b: DirectoryEntry<F> | FileEntry<F>) => {
+    if (a.type === "D" && b.type === "F") {
+        return -1;
+    } else if (a.type === "F" && b.type === "D") {
+        return 1;
+    }
+
+    if (a.type === "D" && b.type === "D") {
+        return a.path.localeCompare(b.path);
+    } else if (a.type === "F" && b.type === "F") {
+        return a.value.path.localeCompare(b.value.path);
+    }
+
+    throw new Error(`Invalid filesystem entry types received: ${a.type} ${b.type}`);
+};
+
+const fetchLauncherPatchFiles = async (patchUrl: string, patchUrlBackup: string): Promise<FileSystem<LauncherPatchFile>> => {
     const res = await fetchAquaWithBackup("launcherlist.txt", patchUrl, patchUrlBackup);
     const data = await res.text();
-    const files: LauncherPatchFile[] = data.split("\n")
+    const files: FileEntry<LauncherPatchFile>[] = data.split("\n")
         .filter(line => line.length > 0)
         .map(line => line.split("\t"))
         .map(row => ({
             path: row[0],
             size: parseInt(row[1]),
             fingerprint: row[2],
+        }))
+        .map(f => ({
+            type: "F",
+            value: f,
         }));
-    return files;
+    return expandFileSystem(files);
 };
 
 const fetchGameListPatchFiles = async (file: string, url: string, backupUrl: string) => {
     const res = await fetchAquaWithBackup(file, url, backupUrl);
     const data = await res.text();
-    const files: GamePatchFile[] = data.split("\n")
+    const files: FileEntry<GamePatchFile>[] = data.split("\n")
         .filter(line => line.length > 0)
         .map(line => line.split("\t"))
-        .map(row => ({
+        .map<GamePatchFile>(row => ({
             path: row[0],
             size: parseInt(row[1]),
             fingerprint: row[2],
             location: row[3] === "p" ? "p" : "m",
+        }))
+        .map(f => ({
+            type: "F",
+            value: f,
         }));
-    return files;
+    return expandFileSystem(files);
 };
 
-const fetchGamePatchFiles = async (patchUrl: string, backupPatchUrl: string) => {
+const fetchGamePatchFiles = async (patchUrl: string, backupPatchUrl: string): Promise<FileSystem<GamePatchFile>> => {
     const classicPromise = fetchGameListPatchFiles("patchlist_classic.txt", patchUrl, backupPatchUrl);
     const rebootPromise = fetchGameListPatchFiles("patchlist_reboot.txt", patchUrl, backupPatchUrl);
     const [classic, reboot] = await Promise.all([classicPromise, rebootPromise]);
@@ -125,6 +208,8 @@ export const fetchPatchData = createAsyncThunk("patchData/fetch", async () => {
     const launcherFilesPromise = fetchLauncherPatchFiles(config.patch, config.patchBackup);
     const gameFilesPromise = fetchGamePatchFiles(config.patch, config.patchBackup);
     const [launcherFiles, gameFiles] = await Promise.all([launcherFilesPromise, gameFilesPromise])
+    launcherFiles.sort(sortFileSystem);
+    gameFiles.sort(sortFileSystem);
     return {
         launcherFiles,
         gameFiles,
