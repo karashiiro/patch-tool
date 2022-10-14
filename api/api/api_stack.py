@@ -24,6 +24,12 @@ class ApiStack(Stack):
             ],
         )
 
+        # Allow web clients to download S3 objects
+        aqua_proxy_bucket.add_cors_rule(
+            allowed_methods=[s3.HttpMethods.GET],
+            allowed_origins=['*'],
+        )
+
         # Create the proxy API
         aqua_proxy_lambda = lambda_.Function(
             self,
@@ -33,7 +39,7 @@ class ApiStack(Stack):
             code=lambda_.Code.from_asset('lambda'),
             environment={
                 'bucket': aqua_proxy_bucket.bucket_name,
-                'bucket_address': aqua_proxy_bucket.bucket_domain_name
+                'bucket_address': aqua_proxy_bucket.bucket_regional_domain_name,
             },
         )
 
