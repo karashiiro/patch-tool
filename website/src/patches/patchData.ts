@@ -106,7 +106,7 @@ const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>): FileSystem<F
                 return fs;
             }
 
-            // Expand files into filesystems, and do push the result to do this recursively if needed
+            // Expand files into filesystems, and push the result to do this recursively if needed
             const [expandMore, dir] = expandFile(e);
             if (expandMore) {
                 arr.push(...dir);
