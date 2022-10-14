@@ -99,7 +99,7 @@ const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>): FileSystem<F
     // Copy the filesystem since this pushes more entries onto it
     const fsCopy = fs.slice();
     const fsClean = fsCopy
-        .map((e, _i, arr) => {
+        .flatMap((e, _i, arr) => {
             // Expand directories recursively
             if (e.type === "D") {
                 const fs: Directory<F> = [{ type: "D", path: e.path, value: expandFileSystem(e.value) }];
@@ -114,7 +114,6 @@ const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>): FileSystem<F
 
             return dir;
         })
-        .flat()
         .reduce<{ directories: Record<string, DirectoryEntry<F>>, fs: FileSystem<F> }>((agg, next) => {
             if (next.type === "F") {
                 // Plain file, just add it
