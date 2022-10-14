@@ -31,7 +31,7 @@ function App() {
             <header className="App">
                 <table>
                     <tbody>
-                    {patchData.launcherFiles.map((f, i) => {
+                    {patchData.gameFiles.map((f, i) => {
                         if (f.type === "D") {
                             return (
                                 <tr key={i}>

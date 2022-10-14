@@ -95,6 +95,32 @@ const expandFile = <F extends PatchFile> (f: FileEntry<F>): [Boolean, Directory<
     return [true, dir];
 };
 
+const mergeFileSystems = <F extends PatchFile> (fs1: FileSystem<F>, fs2: FileSystem<F>): FileSystem<F> => {
+    const fsMerged = fs1.slice();
+    const directories = fsMerged
+        .reduce<Record<string, DirectoryEntry<F>>>((agg, next) => {
+            if (next.type === "D") {
+                agg[next.path] = next;
+            }
+
+            return agg;
+        }, {});
+    for (const entry of fs2) {
+        if (entry.type === "D") {
+            if (entry.path in directories) {
+                const oldDir = directories[entry.path];
+                const newDir = mergeFileSystems(oldDir.value, entry.value);
+                oldDir.value = newDir;
+            } else {
+                directories[entry.path] = entry;
+            }
+        } else {
+            fsMerged.push(entry);
+        }
+    }
+    return fsMerged;
+};
+
 const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>): FileSystem<F> => {
     // Copy the filesystem since this pushes more entries onto it
     const fsCopy = fs.slice();
@@ -176,8 +202,8 @@ const fetchGameListPatchFiles = async (file: string, url: string, backupUrl: str
         .map(line => line.split("\t"))
         .map<GamePatchFile>(row => ({
             path: row[0],
-            size: parseInt(row[1]),
-            fingerprint: row[2],
+            fingerprint: row[1],
+            size: parseInt(row[2]),
             location: row[3] === "p" ? "p" : "m",
         }))
         .map(f => ({
@@ -191,7 +217,7 @@ const fetchGamePatchFiles = async (patchUrl: string, backupPatchUrl: string): Pr
     const classicPromise = fetchGameListPatchFiles("patchlist_classic.txt", patchUrl, backupPatchUrl);
     const rebootPromise = fetchGameListPatchFiles("patchlist_reboot.txt", patchUrl, backupPatchUrl);
     const [classic, reboot] = await Promise.all([classicPromise, rebootPromise]);
-    return classic.concat(reboot);
+    return mergeFileSystems(classic, reboot);
 };
 
 export const fetchPatchData = createAsyncThunk("patchData/fetch", async () => {
