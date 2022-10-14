@@ -1,8 +1,8 @@
-.App-header {
+.App {
   background-color: #282c34;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  font-size: 16pt;
+  font-size: 12pt;
   color: white;
 }

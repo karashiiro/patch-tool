@@ -28,14 +28,18 @@ function App() {
 
     return (
         <div>
-            <header className="App-header">
-                <ul>
-                    {patchData.launcherFiles.map(f => (
-                        <li>
-                            {f.path} - {parseSize(f.size)}
-                        </li>
+            <header className="App">
+                <table>
+                    <tbody>
+                    {patchData.launcherFiles.map((f) => (
+                        <tr key={f.fingerprint}>
+                            <td>{f.path}</td>
+                            <td>{parseSize(f.size)}</td>
+                            <td>{f.fingerprint}</td>
+                        </tr>
                     ))}
-                </ul>
+                    </tbody>
+                </table>
             </header>
         </div>
     );
