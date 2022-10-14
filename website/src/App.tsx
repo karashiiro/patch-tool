@@ -4,7 +4,7 @@ import {useAppDispatch, useAppSelector} from './hooks';
 import {fetchPatchData} from './patches/patchData';
 
 function parseSize(n: number) {
-    const labels = ["B", "MB", "GB"];
+    const labels = ["B", "KB", "MB", "GB"];
     let i = 0;
     for (; i < labels.length; i++) {
         if (n >= 1024) {
