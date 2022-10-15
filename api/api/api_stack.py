@@ -41,6 +41,7 @@ class ApiStack(Stack):
                 'bucket': aqua_proxy_bucket.bucket_name,
                 'bucket_address': aqua_proxy_bucket.bucket_regional_domain_name,
             },
+            timeout=Duration.seconds(5),
         )
 
         aqua_proxy_bucket.grant_read_write(aqua_proxy_lambda)
