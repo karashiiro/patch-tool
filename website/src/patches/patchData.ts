@@ -113,7 +113,7 @@ const createFileSystemDirectoriesMemo = <F extends PatchFile> (): FileSystemDire
     return new Map<FileSystem<F>, FileSystemDirectories<F>>()
 };
 
-const getDirectoryEntries = <F extends PatchFile> (fs: FileSystem<F>, memo = createFileSystemDirectoriesMemo<F>()): FileSystemDirectories<F> => {
+export const getDirectoryEntries = <F extends PatchFile> (fs: FileSystem<F>, memo = createFileSystemDirectoriesMemo<F>()): FileSystemDirectories<F> => {
     // This is memoized because it repeatedly gets called with the same object
     // for fs1 in mergeFileSystems.
     const existing = memo.get(fs);

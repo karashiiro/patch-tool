@@ -6,3 +6,26 @@
     font-size: 12pt;
     color: white;
 }
+
+a {
+    color: rgb(0, 102, 255);
+}
+
+.table {
+    display: inline-block;
+    border-spacing: 0;
+    border: 1px solid black;
+}
+
+.th,
+.td {
+    margin: 0;
+    padding: 0.5rem;
+    border-bottom: 1px solid black;
+    border-right: 1px solid black;
+}
+
+.th:last-child,
+.td:last-child {
+    border-right: 1px solid black;
+}
