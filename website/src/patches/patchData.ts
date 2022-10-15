@@ -239,7 +239,7 @@ export const filterFileSystemBySegments = <F extends PatchFile> (fs: FileSystem<
     return filterFileSystemBySegments(dir?.value ?? [], newPathSegments);
 };
 
-const sortFileSystem = <F extends PatchFile> (a: FileSystemEntry<F>, b:FileSystemEntry<F>) => {
+const sortFileSystemDir = <F extends PatchFile> (a: FileSystemEntry<F>, b:FileSystemEntry<F>) => {
     if (isDirectoryEntry(a) && isFileEntry(b)) {
         return -1;
     } else if (isFileEntry(a) && isDirectoryEntry(b)) {
@@ -253,6 +253,15 @@ const sortFileSystem = <F extends PatchFile> (a: FileSystemEntry<F>, b:FileSyste
     }
 
     throw new Error(`Invalid filesystem entry types received: ${a.type} ${b.type}`);
+};
+
+const sortFileSystem = <F extends PatchFile> (fs: FileSystem<F>) => {
+    fs.sort(sortFileSystemDir)
+    for (const entry of fs) {
+        if (isDirectoryEntry(entry)) {
+            sortFileSystem(entry.value);
+        }
+    }
 };
 
 const fetchLauncherPatchFiles = async (patchUrl: string, patchUrlBackup: string): Promise<FileSystem<LauncherPatchFile>> => {
@@ -313,8 +322,8 @@ export const fetchPatchData = createAsyncThunk("patchData/fetch", async () => {
     const launcherFilesPromise = fetchLauncherPatchFiles(config.patch, config.patchBackup);
     const gameFilesPromise = fetchGamePatchFiles(config.patch, config.patchBackup);
     const [launcherFiles, gameFiles] = await Promise.all([launcherFilesPromise, gameFilesPromise])
-    launcherFiles.sort(sortFileSystem);
-    gameFiles.sort(sortFileSystem);
+    sortFileSystem(launcherFiles);
+    sortFileSystem(gameFiles);
     return {
         launcherFiles,
         gameFiles,
