@@ -105,70 +105,115 @@ const expandFile = <F extends PatchFile> (f: FileEntry<F>): [Boolean, Directory<
     return [true, dir];
 };
 
-const mergeFileSystems = <F extends PatchFile> (fs1: FileSystem<F>, fs2: FileSystem<F>): FileSystem<F> => {
-    const fsMerged = fs1.slice();
-    const directories = fsMerged
-        .reduce<Record<string, DirectoryEntry<F>>>((agg, next) => {
-            if (isDirectoryEntry(next)) {
-                agg[next.path] = next;
-            }
+type FileSystemDirectories<F extends PatchFile> = Map<string, DirectoryEntry<F>>;
 
-            return agg;
-        }, {});
-    fs2.forEach(entry => {
-        if (isDirectoryEntry(entry)) {
-            if (entry.path in directories) {
-                const oldDir = directories[entry.path];
-                const newDir = mergeFileSystems(oldDir.value, entry.value);
-                oldDir.value = newDir;
-            } else {
-                directories[entry.path] = entry;
-                fsMerged.push(entry);
-            }
-        } else {
-            fsMerged.push(entry);
-        }
-    });
-    return fsMerged;
+type FileSystemDirectoriesMemo<F extends PatchFile> = Map<FileSystem<F>, FileSystemDirectories<F>>;
+
+const createFileSystemDirectoriesMemo = <F extends PatchFile> (): FileSystemDirectoriesMemo<F> => {
+    return new Map<FileSystem<F>, FileSystemDirectories<F>>()
 };
 
-const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>): FileSystem<F> => {
-    // Copy the filesystem since this pushes more entries onto it
-    const fsCopy = fs.slice();
-    const fsClean = fsCopy
-        .flatMap(e => {
-            // Expand directories recursively
-            if (isDirectoryEntry(e)) {
-                const fs: Directory<F> = [{ type: "D", path: e.path, value: expandFileSystem(e.value) }];
-                return fs;
+const getDirectoryEntries = <F extends PatchFile> (fs: FileSystem<F>, memo = createFileSystemDirectoriesMemo<F>()): FileSystemDirectories<F> => {
+    // This is memoized because it repeatedly gets called with the same object
+    // for fs1 in mergeFileSystems.
+    const existing = memo.get(fs);
+    if (existing != null) {
+        return existing;
+    }
+
+    const agg: Map<string, DirectoryEntry<F>> = new Map();
+    for (const entry of fs) {
+        if (isDirectoryEntry(entry)) {
+            agg.set(entry.path, entry);
+        }
+    }
+
+    memo.set(fs, agg);
+    return agg;
+};
+
+const areArraysEqual = <T> (s1: T[], s2: T[]) => {
+    return s1.length === s2.length && s1.every((x) => s2.includes(x));
+};
+
+/**
+ * Merge two filesystems in-place. `fs1` will contain the result of the merge operation.
+ * @param fs1 The first filesystem. This will contain the result of the operation.
+ * @param fs2 The second filesystem. This will be unmodified after the operation.
+ */
+const mergeFileSystems = <F extends PatchFile> (fs1: FileSystem<F>, fs2: FileSystem<F>, memo = createFileSystemDirectoriesMemo<F>()) => {
+    const directories1 = getDirectoryEntries(fs1, memo);
+    const directories2 = getDirectoryEntries(fs2, memo);
+    const dirSet1 = [...directories1.keys()];
+    const dirSet2 = [...directories2.keys()];
+    if (areArraysEqual(dirSet1, dirSet2) && fs2.filter(isFileEntry).length === 0) {
+        // Fast path for the top level of fs2 being a subset of fs1
+        directories2.forEach((entry, path) => {
+            const existingEntry = directories1.get(path);
+            if (existingEntry == null) {
+                throw new Error("Merge directory entry is missing!")
             }
 
-            // Expand files into filesystems, and do this recursively if needed
-            const [expandMore, dir] = expandFile(e);
-            if (expandMore) {
-                return expandFileSystem(dir);
-            }
-
-            return dir;
-        })
-        .reduce<{ directories: Record<string, DirectoryEntry<F>>, fs: FileSystem<F> }>((agg, next) => {
-            if (isFileEntry(next)) {
-                // Plain file, just add it
-                agg.fs.push(next);
-            } else {
-                // Only add the directory if it hasn't already been added; otherwise, merge the directory
-                // with the existing one
-                if (next.path in agg.directories) {
-                    agg.directories[next.path].value = mergeFileSystems(agg.directories[next.path].value, next.value);
+            existingEntry.value.push(entry);
+        });
+    } else {
+        for (const entry of fs2) {
+            if (isDirectoryEntry(entry)) {
+                // Check if we've already looked at a directory with the same name
+                // and merge the existing one with the current one, if possible
+                const existingEntry = directories1.get(entry.path);
+                if (existingEntry != null) {
+                    mergeFileSystems(existingEntry.value, entry.value);
                 } else {
-                    agg.directories[next.path] = next;
-                    agg.fs.push(next);
+                    directories1.set(entry.path, entry);
+                    fs1.push(entry);
                 }
+            } else {
+                // This is just a file, push it
+                fs1.push(entry);
             }
+        }
+    }
+};
 
-            return agg;
-        }, { directories: {}, fs: [] });
-    return fsClean.fs;
+const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>, memo = createFileSystemDirectoriesMemo<F>()): FileSystem<F> => {
+    const fsResult: FileSystem<F> = [];
+    for (const entry of fs) {
+        // Expand directories recursively
+        if (isDirectoryEntry(entry)) {
+            const fs: Directory<F> = [{ type: "D", path: entry.path, value: expandFileSystem(entry.value) }];
+            fsResult.push(...fs);
+        } else {
+            // Expand files into filesystems, and do this recursively if needed
+            const [expandMore, dir] = expandFile(entry);
+            if (expandMore) {
+                fsResult.push(...expandFileSystem(dir));
+            } else {
+                fsResult.push(...dir);
+            }
+        }
+    }
+
+    const fsClean: FileSystem<F> = [];
+    const directories: Map<string, DirectoryEntry<F>> = new Map();
+    for (const entry of fsResult) {
+        if (isFileEntry(entry)) {
+            // Plain file, just add it
+            fsClean.push(entry);
+        } else {
+            // Only add the directory if it hasn't already been added; otherwise, merge the directory
+            // with the existing one
+            const existingEntry = directories.get(entry.path);
+            if (existingEntry != null) {
+                mergeFileSystems(existingEntry.value, entry.value, memo);
+            } else {
+                directories.set(entry.path, entry);
+                fsClean.push(entry);
+            }
+        }
+    }
+
+    return fsClean;
 };
 
 export const getFileSystemSize = <F extends PatchFile> (fs: FileSystem<F>): number => {
@@ -249,7 +294,8 @@ const fetchGamePatchFiles = async (patchUrl: string, backupPatchUrl: string): Pr
     const classicPromise = fetchGameListPatchFiles("patchlist_classic.txt", patchUrl, backupPatchUrl);
     const rebootPromise = fetchGameListPatchFiles("patchlist_reboot.txt", patchUrl, backupPatchUrl);
     const [classic, reboot] = await Promise.all([classicPromise, rebootPromise]);
-    return mergeFileSystems(classic, reboot);
+    mergeFileSystems(classic, reboot);
+    return classic;
 };
 
 export const fetchPatchData = createAsyncThunk("patchData/fetch", async () => {
