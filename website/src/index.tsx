@@ -1,10 +1,23 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import {
+    createHashRouter,
+    RouterProvider,
+  } from "react-router-dom";
 import './index.css';
-import App from './App';
+import Root, {PatchFiles} from "./routes/root";
 import reportWebVitals from './reportWebVitals';
 import {Provider} from "react-redux";
 import {store} from "./store";
+
+const router = createHashRouter([{
+    path: "/",
+    element: <Root />,
+    children: [{
+        path: "/",
+        element: <PatchFiles />
+    }],
+}]);
 
 const root = ReactDOM.createRoot(
     document.getElementById('root') as HTMLElement
@@ -12,7 +25,7 @@ const root = ReactDOM.createRoot(
 root.render(
     <React.StrictMode>
         <Provider store={store}>
-            <App/>
+            <RouterProvider router={router} />
         </Provider>
     </React.StrictMode>
 );
