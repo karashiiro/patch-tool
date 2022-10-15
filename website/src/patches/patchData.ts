@@ -45,6 +45,14 @@ const initialState: PatchData = {
     status: "not-retrieved",
 };
 
+export const isDirectoryEntry = <F> (e: FileSystemEntry<F>): e is DirectoryEntry<F> => {
+    return e.type === "D";
+};
+
+export const isFileEntry = <F> (e: FileSystemEntry<F>): e is FileEntry<F> => {
+    return e.type === "F";
+};
+
 const fetchAqua = async (url: string) => {
     if (process.env.REACT_APP_AQUA_PROXY == null) {
         throw new Error("Environment variable REACT_APP_AQUA_PROXY not set!");
@@ -97,22 +105,18 @@ const expandFile = <F extends PatchFile> (f: FileEntry<F>): [Boolean, Directory<
     return [true, dir];
 };
 
-export const isDirectoryEntry = <F> (e: FileSystemEntry<F>): e is DirectoryEntry<F> => {
-    return e.type === "D";
-};
-
 const mergeFileSystems = <F extends PatchFile> (fs1: FileSystem<F>, fs2: FileSystem<F>): FileSystem<F> => {
     const fsMerged = fs1.slice();
     const directories = fsMerged
         .reduce<Record<string, DirectoryEntry<F>>>((agg, next) => {
-            if (next.type === "D") {
+            if (isDirectoryEntry(next)) {
                 agg[next.path] = next;
             }
 
             return agg;
         }, {});
     fs2.forEach(entry => {
-        if (entry.type === "D") {
+        if (isDirectoryEntry(entry)) {
             if (entry.path in directories) {
                 const oldDir = directories[entry.path];
                 const newDir = mergeFileSystems(oldDir.value, entry.value);
@@ -134,7 +138,7 @@ const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>): FileSystem<F
     const fsClean = fsCopy
         .flatMap(e => {
             // Expand directories recursively
-            if (e.type === "D") {
+            if (isDirectoryEntry(e)) {
                 const fs: Directory<F> = [{ type: "D", path: e.path, value: expandFileSystem(e.value) }];
                 return fs;
             }
@@ -148,7 +152,7 @@ const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>): FileSystem<F
             return dir;
         })
         .reduce<{ directories: Record<string, DirectoryEntry<F>>, fs: FileSystem<F> }>((agg, next) => {
-            if (next.type === "F") {
+            if (isFileEntry(next)) {
                 // Plain file, just add it
                 agg.fs.push(next);
             } else {
@@ -169,7 +173,7 @@ const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>): FileSystem<F
 
 export const getFileSystemSize = <F extends PatchFile> (fs: FileSystem<F>): number => {
     return fs.reduce((agg, next) => {
-        if (next.type === "D") {
+        if (isDirectoryEntry(next)) {
             return agg + getFileSystemSize(next.value);
         } else {
             return agg + next.value.size;
@@ -189,15 +193,15 @@ export const filterFileSystemBySegments = <F extends PatchFile> (fs: FileSystem<
 };
 
 const sortFileSystem = <F extends PatchFile> (a: FileSystemEntry<F>, b:FileSystemEntry<F>) => {
-    if (a.type === "D" && b.type === "F") {
+    if (isDirectoryEntry(a) && isFileEntry(b)) {
         return -1;
-    } else if (a.type === "F" && b.type === "D") {
+    } else if (isFileEntry(a) && isDirectoryEntry(b)) {
         return 1;
     }
 
-    if (a.type === "D" && b.type === "D") {
+    if (isDirectoryEntry(a) && isDirectoryEntry(b)) {
         return a.path.localeCompare(b.path);
-    } else if (a.type === "F" && b.type === "F") {
+    } else if (isFileEntry(a) && isFileEntry(b)) {
         return a.value.path.localeCompare(b.value.path);
     }
 
