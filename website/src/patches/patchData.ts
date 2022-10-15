@@ -111,7 +111,7 @@ const mergeFileSystems = <F extends PatchFile> (fs1: FileSystem<F>, fs2: FileSys
 
             return agg;
         }, {});
-    for (const entry of fs2) {
+    fs2.forEach(entry => {
         if (entry.type === "D") {
             if (entry.path in directories) {
                 const oldDir = directories[entry.path];
@@ -119,11 +119,12 @@ const mergeFileSystems = <F extends PatchFile> (fs1: FileSystem<F>, fs2: FileSys
                 oldDir.value = newDir;
             } else {
                 directories[entry.path] = entry;
+                fsMerged.push(entry);
             }
         } else {
             fsMerged.push(entry);
         }
-    }
+    });
     return fsMerged;
 };
 
@@ -131,17 +132,17 @@ const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>): FileSystem<F
     // Copy the filesystem since this pushes more entries onto it
     const fsCopy = fs.slice();
     const fsClean = fsCopy
-        .flatMap((e, _i, arr) => {
+        .flatMap(e => {
             // Expand directories recursively
             if (e.type === "D") {
                 const fs: Directory<F> = [{ type: "D", path: e.path, value: expandFileSystem(e.value) }];
                 return fs;
             }
 
-            // Expand files into filesystems, and push the result to do this recursively if needed
+            // Expand files into filesystems, and do this recursively if needed
             const [expandMore, dir] = expandFile(e);
             if (expandMore) {
-                arr.push(...dir);
+                return expandFileSystem(dir);
             }
 
             return dir;
@@ -154,7 +155,7 @@ const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>): FileSystem<F
                 // Only add the directory if it hasn't already been added; otherwise, merge the directory
                 // with the existing one
                 if (next.path in agg.directories) {
-                    agg.directories[next.path].value.push(...next.value);
+                    agg.directories[next.path].value = mergeFileSystems(agg.directories[next.path].value, next.value);
                 } else {
                     agg.directories[next.path] = next;
                     agg.fs.push(next);
@@ -279,15 +280,15 @@ const patchDataSlice = createSlice({
                 state.status = "updating";
             })
             .addCase(fetchPatchData.fulfilled, (state, action) => {
+                state.status = "updated";
                 state.launcherFiles = action.payload.launcherFiles;
                 state.gameFiles = action.payload.gameFiles;
                 state.repositories = action.payload.config;
-                state.status = "updated";
                 console.log(action.payload);
             })
             .addCase(fetchPatchData.rejected, (state, action) => {
-                console.error(action.error);
                 state.status = "error";
+                console.error(action.error);
             });
     },
 });

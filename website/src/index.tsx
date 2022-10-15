@@ -13,13 +13,15 @@ import { useAppSelector, useAppDispatch } from './hooks';
 import { fetchPatchData, isDirectoryEntry, DirectoryEntry, LauncherPatchFile, GamePatchFile } from './patches/patchData';
 
 function DynamicHashRouter() {
-    const patchData = useAppSelector(state => state.patchData);
+    const patchDataStatus = useAppSelector(state => state.patchData.status);
+    const patchDataLauncherFiles = useAppSelector(state => state.patchData.launcherFiles);
+    const patchDataGameFiles = useAppSelector(state => state.patchData.gameFiles);
     const dispatch = useAppDispatch();
     useEffect(() => {
-        if (patchData.status === 'not-retrieved') {
+        if (patchDataStatus === "not-retrieved") {
             dispatch(fetchPatchData());
         }
-    }, [dispatch, patchData.status]);
+    }, [dispatch, patchDataStatus]);
 
     const router = createHashRouter([{
         path: "/",
@@ -34,13 +36,13 @@ function DynamicHashRouter() {
             path: "/game",
             element: <PatchFiles list="game" pathSegments={[]} />,
         },
-        ...patchData.launcherFiles
+        ...patchDataLauncherFiles
             .filter<DirectoryEntry<LauncherPatchFile>>(isDirectoryEntry)
             .map(e => ({
                 path: `/launcher/${e.path}`,
                 element: <PatchFiles list="launcher" pathSegments={[e.path]} />,
             })),
-        ...patchData.gameFiles
+        ...patchDataGameFiles
             .filter<DirectoryEntry<GamePatchFile>>(isDirectoryEntry)
             .map(e => ({
                 path: `/game/${e.path}`,
