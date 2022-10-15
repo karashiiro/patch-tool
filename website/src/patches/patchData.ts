@@ -154,7 +154,8 @@ const mergeFileSystems = <F extends PatchFile> (fs1: FileSystem<F>, fs2: FileSys
                 throw new Error("Merge directory entry is missing!")
             }
 
-            existingEntry.value.push(entry);
+            // This directory needs to be merged, push its contents
+            existingEntry.value.push(...entry.value);
         });
     } else {
         for (const entry of fs2) {
@@ -165,6 +166,7 @@ const mergeFileSystems = <F extends PatchFile> (fs1: FileSystem<F>, fs2: FileSys
                 if (existingEntry != null) {
                     mergeFileSystems(existingEntry.value, entry.value);
                 } else {
+                    // This directory is new, push it
                     directories1.set(entry.path, entry);
                     fs1.push(entry);
                 }
@@ -234,7 +236,7 @@ export const filterFileSystemBySegments = <F extends PatchFile> (fs: FileSystem<
     const newPathSegments = pathSegments.slice();
     const path = newPathSegments.shift();
     const dir = fs.filter(isDirectoryEntry).find(e => e.path === path);
-    return dir?.value ?? [];
+    return filterFileSystemBySegments(dir?.value ?? [], newPathSegments);
 };
 
 const sortFileSystem = <F extends PatchFile> (a: FileSystemEntry<F>, b:FileSystemEntry<F>) => {
@@ -334,7 +336,6 @@ const patchDataSlice = createSlice({
                 state.launcherFiles = action.payload.launcherFiles;
                 state.gameFiles = action.payload.gameFiles;
                 state.repositories = action.payload.config;
-                console.log(action.payload);
             })
             .addCase(fetchPatchData.rejected, (state, action) => {
                 state.status = "error";
