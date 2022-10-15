@@ -3,7 +3,7 @@ import {useAppSelector} from '../hooks';
 import {FileSystem, filterFileSystemBySegments, getFileSystemSize, PatchFile} from '../patches/patchData';
 import { Link, Outlet } from 'react-router-dom';
 
-type PatchList = "launcher" | "game";
+export type PatchList = "launcher" | "game";
 
 function parseSize(n: number) {
     const labels = ["B", "KB", "MB", "GB"];

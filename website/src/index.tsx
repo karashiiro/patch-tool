@@ -2,15 +2,39 @@ import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import {
     createHashRouter,
+    RouteObject,
     RouterProvider,
   } from "react-router-dom";
 import './index.css';
-import Root, {Index, PatchFiles} from "./routes/root";
+import Root, {Index, PatchFiles, PatchList} from "./routes/root";
 import reportWebVitals from './reportWebVitals';
 import {Provider} from "react-redux";
 import {store} from "./store";
 import { useAppSelector, useAppDispatch } from './hooks';
-import { fetchPatchData, isDirectoryEntry, DirectoryEntry, LauncherPatchFile, GamePatchFile } from './patches/patchData';
+import { fetchPatchData, isDirectoryEntry, DirectoryEntry, PatchFile, FileSystem } from './patches/patchData';
+
+function expandRoutesDir<F extends PatchFile>(base: string, list: PatchList, pathSegments: string[], dir: DirectoryEntry<F>): RouteObject[] {
+    const innerDirs = dir.value.filter(isDirectoryEntry);
+    const routes: RouteObject[] = [{
+        path: `${base}/${dir.path}`,
+        element: <PatchFiles list={list} pathSegments={[...pathSegments, dir.path]} />,
+    }];
+
+    routes.push(...innerDirs.flatMap<RouteObject>(d => {
+        return expandRoutesDir(`${base}/${dir.path}`, list, [...pathSegments, dir.path], d);
+    }));
+
+    return routes;
+}
+
+function expandRoutes<F extends PatchFile>(base: string, list: PatchList, fs: FileSystem<F>): RouteObject[] {
+    const dirs = fs.filter(isDirectoryEntry);
+    const res = dirs.flatMap<RouteObject>(dir => {
+        return expandRoutesDir(base, list, [], dir);
+    });
+
+    return res;
+}
 
 function DynamicHashRouter() {
     const patchDataStatus = useAppSelector(state => state.patchData.status);
@@ -23,32 +47,28 @@ function DynamicHashRouter() {
         }
     }, [dispatch, patchDataStatus]);
 
-    const router = createHashRouter([{
-        path: "/",
-        element: <Root />,
-        children: [{
+    const router = createHashRouter([
+        {
             path: "/",
-            element: <Index />,
-        }, {
-            path: "/launcher",
-            element: <PatchFiles list="launcher" pathSegments={[]} />,
-        }, {
-            path: "/game",
-            element: <PatchFiles list="game" pathSegments={[]} />,
-        },
-        ...patchDataLauncherFiles
-            .filter<DirectoryEntry<LauncherPatchFile>>(isDirectoryEntry)
-            .map(e => ({
-                path: `/launcher/${e.path}`,
-                element: <PatchFiles list="launcher" pathSegments={[e.path]} />,
-            })),
-        ...patchDataGameFiles
-            .filter<DirectoryEntry<GamePatchFile>>(isDirectoryEntry)
-            .map(e => ({
-                path: `/game/${e.path}`,
-                element: <PatchFiles list="game" pathSegments={[e.path]} />,
-            }))],
-    }]);
+            element: <Root />,
+            children: [
+                {
+                    path: "/",
+                    element: <Index />,
+                },
+                {
+                    path: "/launcher",
+                    element: <PatchFiles list="launcher" pathSegments={[]} />,
+                },
+                {
+                    path: "/game",
+                    element: <PatchFiles list="game" pathSegments={[]} />,
+                },
+                ...expandRoutes("/launcher", "launcher", patchDataLauncherFiles),
+                ...expandRoutes("/game", "game", patchDataGameFiles),
+            ]
+        }
+    ]);
 
     return <RouterProvider router={router} />;
 }
