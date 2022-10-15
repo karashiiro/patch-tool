@@ -4,23 +4,25 @@ type PatchLocation = "m" | "p";
 
 type PatchFetchStatus = "error" | "not-retrieved" | "updating" | "updated";
 
-type FileEntry<F> = { type: "F", value: F };
+export type FileEntry<F> = { type: "F", value: F };
 
-type DirectoryEntry<F> = { type: "D", path: string, value: Directory<F> };
+export type DirectoryEntry<F> = { type: "D", path: string, value: Directory<F> };
 
-type Directory<F> = (DirectoryEntry<F> | FileEntry<F>)[];
+export type FileSystemEntry<F> = DirectoryEntry<F> | FileEntry<F>;
 
-type FileSystem<F> = Directory<F>;
+export type Directory<F> = FileSystemEntry<F>[];
 
-interface PatchFile {
+export type FileSystem<F> = Directory<F>;
+
+export interface PatchFile {
     path: string;
     size: number;
     fingerprint: string;
 }
 
-interface LauncherPatchFile extends PatchFile {}
+export interface LauncherPatchFile extends PatchFile {}
 
-interface GamePatchFile extends PatchFile{
+export interface GamePatchFile extends PatchFile {
     location: PatchLocation;
 }
 
@@ -95,6 +97,10 @@ const expandFile = <F extends PatchFile> (f: FileEntry<F>): [Boolean, Directory<
     return [true, dir];
 };
 
+export const isDirectoryEntry = <F> (e: FileSystemEntry<F>): e is DirectoryEntry<F> => {
+    return e.type === "D";
+};
+
 const mergeFileSystems = <F extends PatchFile> (fs1: FileSystem<F>, fs2: FileSystem<F>): FileSystem<F> => {
     const fsMerged = fs1.slice();
     const directories = fsMerged
@@ -160,7 +166,28 @@ const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>): FileSystem<F
     return fsClean.fs;
 };
 
-const sortFileSystem = <F extends PatchFile> (a: DirectoryEntry<F> | FileEntry<F>, b: DirectoryEntry<F> | FileEntry<F>) => {
+export const getFileSystemSize = <F extends PatchFile> (fs: FileSystem<F>): number => {
+    return fs.reduce((agg, next) => {
+        if (next.type === "D") {
+            return agg + getFileSystemSize(next.value);
+        } else {
+            return agg + next.value.size;
+        }
+    }, 0);
+};
+
+export const filterFileSystemBySegments = <F extends PatchFile> (fs: FileSystem<F>, pathSegments: string[]): FileSystem<F> => {
+    if (fs.length === 0 || pathSegments.length === 0) {
+        return fs;
+    }
+
+    const newPathSegments = pathSegments.slice();
+    const path = newPathSegments.shift();
+    const dir = fs.filter(isDirectoryEntry).find(e => e.path === path);
+    return dir?.value ?? [];
+};
+
+const sortFileSystem = <F extends PatchFile> (a: FileSystemEntry<F>, b:FileSystemEntry<F>) => {
     if (a.type === "D" && b.type === "F") {
         return -1;
     } else if (a.type === "F" && b.type === "D") {

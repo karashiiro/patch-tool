@@ -1,8 +1,10 @@
-import {useEffect} from 'react';
+import {useEffect, useMemo} from 'react';
 import './root.css';
 import {useAppDispatch, useAppSelector} from '../hooks';
-import {fetchPatchData} from '../patches/patchData';
-import { Outlet } from 'react-router-dom';
+import {fetchPatchData, FileSystem, filterFileSystemBySegments, getFileSystemSize, PatchFile} from '../patches/patchData';
+import { Link, Outlet } from 'react-router-dom';
+
+type PatchList = "launcher" | "game";
 
 function parseSize(n: number) {
     const labels = ["B", "KB", "MB", "GB"];
@@ -18,24 +20,27 @@ function parseSize(n: number) {
     return `${n}${labels[i]}`;
 }
 
-export function PatchFiles() {
-    const patchData = useAppSelector(state => state.patchData);
-    const dispatch = useAppDispatch();
-    useEffect(() => {
-        if (patchData.status === 'not-retrieved') {
-            dispatch(fetchPatchData());
-        }
-    }, [dispatch, patchData.status]);
+function PatchFilesSuccess<F extends PatchFile>({ files, pathSegments }: { files: FileSystem<F>, pathSegments: string[] }) {
+    const filesDir = filterFileSystemBySegments(files, pathSegments);
+    const directorySizes = useMemo(() => {
+        return files.reduce<Record<string, number>>((agg, next) => {
+            if (next.type === "D") {
+                agg[next.path] = getFileSystemSize(next.value);
+            }
+
+            return agg;
+        }, {});
+    }, [filesDir]);
 
     return (
         <table>
             <tbody>
-            {patchData.gameFiles.map((f, i) => {
+            {filesDir.map((f, i) => {
                 if (f.type === "D") {
                     return (
                         <tr key={i}>
-                            <td>{f.path}</td>
-                            <td></td>
+                            <td><Link to={f.path}>{f.path}</Link></td>
+                            <td>{parseSize(directorySizes[f.path])}</td>
                             <td></td>
                         </tr>
                     );
@@ -49,6 +54,53 @@ export function PatchFiles() {
                     </tr>
                 );
             })}
+            </tbody>
+        </table>
+    );
+}
+
+export function PatchFiles({ list, pathSegments }: { list: PatchList, pathSegments: string[] }) {
+    const patchData = useAppSelector(state => state.patchData);
+    const dispatch = useAppDispatch();
+    useEffect(() => {
+        if (patchData.status === "not-retrieved") {
+            dispatch(fetchPatchData());
+        }
+    }, [dispatch, patchData.status]);
+
+    if (patchData.status === "error") {
+        return <pre>An error occurred.</pre>;
+    }
+
+    const files = list === "game" ? patchData.gameFiles : patchData.launcherFiles;
+    return <PatchFilesSuccess files={files} pathSegments={pathSegments} />;
+}
+
+export function Index() {
+    const patchData = useAppSelector(state => state.patchData);
+    const dispatch = useAppDispatch();
+    useEffect(() => {
+        if (patchData.status === 'not-retrieved') {
+            dispatch(fetchPatchData());
+        }
+    }, [dispatch, patchData.status]);
+
+    const launcherSize = useMemo(() => getFileSystemSize(patchData.launcherFiles), [patchData.launcherFiles]);
+    const gameSize = useMemo(() => getFileSystemSize(patchData.gameFiles), [patchData.gameFiles]);
+
+    return (
+        <table>
+            <tbody>
+                <tr>
+                    <td><Link to="/launcher">launcher</Link></td>
+                    <td>{parseSize(launcherSize)}</td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td><Link to="/game">game</Link></td>
+                    <td>{parseSize(gameSize)}</td>
+                    <td></td>
+                </tr>
             </tbody>
         </table>
     );

@@ -1,23 +1,55 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import {
     createHashRouter,
     RouterProvider,
   } from "react-router-dom";
 import './index.css';
-import Root, {PatchFiles} from "./routes/root";
+import Root, {Index, PatchFiles} from "./routes/root";
 import reportWebVitals from './reportWebVitals';
 import {Provider} from "react-redux";
 import {store} from "./store";
+import { useAppSelector, useAppDispatch } from './hooks';
+import { fetchPatchData, isDirectoryEntry, DirectoryEntry, LauncherPatchFile, GamePatchFile } from './patches/patchData';
 
-const router = createHashRouter([{
-    path: "/",
-    element: <Root />,
-    children: [{
+function DynamicHashRouter() {
+    const patchData = useAppSelector(state => state.patchData);
+    const dispatch = useAppDispatch();
+    useEffect(() => {
+        if (patchData.status === 'not-retrieved') {
+            dispatch(fetchPatchData());
+        }
+    }, [dispatch, patchData.status]);
+
+    const router = createHashRouter([{
         path: "/",
-        element: <PatchFiles />
-    }],
-}]);
+        element: <Root />,
+        children: [{
+            path: "/",
+            element: <Index />,
+        }, {
+            path: "/launcher",
+            element: <PatchFiles list="launcher" pathSegments={[]} />,
+        }, {
+            path: "/game",
+            element: <PatchFiles list="game" pathSegments={[]} />,
+        },
+        ...patchData.launcherFiles
+            .filter<DirectoryEntry<LauncherPatchFile>>(isDirectoryEntry)
+            .map(e => ({
+                path: `/launcher/${e.path}`,
+                element: <PatchFiles list="launcher" pathSegments={[e.path]} />,
+            })),
+        ...patchData.gameFiles
+            .filter<DirectoryEntry<GamePatchFile>>(isDirectoryEntry)
+            .map(e => ({
+                path: `/game/${e.path}`,
+                element: <PatchFiles list="game" pathSegments={[e.path]} />,
+            }))],
+    }]);
+
+    return <RouterProvider router={router} />;
+}
 
 const root = ReactDOM.createRoot(
     document.getElementById('root') as HTMLElement
@@ -25,7 +57,7 @@ const root = ReactDOM.createRoot(
 root.render(
     <React.StrictMode>
         <Provider store={store}>
-            <RouterProvider router={router} />
+            <DynamicHashRouter />
         </Provider>
     </React.StrictMode>
 );
