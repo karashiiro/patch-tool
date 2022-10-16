@@ -1,8 +1,9 @@
 import {combineReducers} from "redux"
-import {reducer as patchDataReducer} from "./patches/patchData";
+import {launcherDataReducer, gameDataReducer} from "./patches/patchData";
 
 export const rootReducer = combineReducers({
-    patchData: patchDataReducer,
+    launcherData: launcherDataReducer,
+    gameData: gameDataReducer,
 });
 
 export type RootState = ReturnType<typeof rootReducer>;

@@ -1,14 +1,12 @@
 import './root.css';
 import {useAppSelector} from '../hooks';
-import {FileSystem, FileSystemEntry, filterFileSystemBySegments, getDirectoryEntries, getFileSystemSize, isDirectoryEntry, PatchFile} from '../patches/patchData';
+import {FileSystem, FileSystemEntry, getDirectoryEntries, getFileSystemSize, isDirectoryEntry, PatchFetchStatus, PatchFile} from '../patches/patchData';
 import { Link, Outlet } from 'react-router-dom';
 import { CSSProperties, useMemo } from 'react';
 import { useBlockLayout, useTable } from 'react-table';
 import { useCallback } from 'react';
 import { FixedSizeList } from 'react-window';
 import {useScrollbarWidth, useWindowSize} from 'react-use';
-
-export type PatchList = "launcher" | "game";
 
 function parseSize(n: number) {
     const labels = ["B", "KB", "MB", "GB"];
@@ -24,18 +22,17 @@ function parseSize(n: number) {
     return `${n}${labels[i]}`;
 }
 
-function PatchFilesSuccess<F extends PatchFile>({ files, pathSegments }: { files: FileSystem<F>, pathSegments: string[] }) {
-    const filesDir = filterFileSystemBySegments(files, pathSegments);
+function PatchFilesSuccess<F extends PatchFile>({ files }: { files: FileSystem<F> }) {
     const directorySizes = useMemo(() => {
-        return filesDir.reduce<Record<string, number>>((agg, next) => {
+        return files.reduce<Record<string, number>>((agg, next) => {
             if (next.type === "D") {
                 agg[next.path] = getFileSystemSize(next.value);
             }
 
             return agg;
         }, {});
-    }, [filesDir]);
-    const directories = useMemo(() => getDirectoryEntries(filesDir), [filesDir]);
+    }, [files]);
+    const directories = useMemo(() => getDirectoryEntries(files), [files]);
 
     const columns = useMemo(() => [
         {
@@ -57,7 +54,7 @@ function PatchFilesSuccess<F extends PatchFile>({ files, pathSegments }: { files
     const scrollBarWidth = useScrollbarWidth();
     const {width, height} = useWindowSize();
 
-    const data = useMemo(() => filesDir, [filesDir]);
+    const data = useMemo(() => files, [files]);
     const defaultColumn = useMemo(() => ({ width: (width - (scrollBarWidth ?? 0) - 1) / 3 }), [width, scrollBarWidth]);
     const scrollBarSize = useMemo(() => scrollBarWidth ?? 0, [scrollBarWidth]);
     const {
@@ -118,11 +115,7 @@ function PatchFilesSuccess<F extends PatchFile>({ files, pathSegments }: { files
     );
 }
 
-export function PatchFiles({ list, pathSegments }: { list: PatchList, pathSegments: string[] }) {
-    const patchDataStatus = useAppSelector(state => state.patchData.status);
-    const patchDataLauncherFiles = useAppSelector(state => state.patchData.launcherFiles);
-    const patchDataGameFiles = useAppSelector(state => state.patchData.gameFiles);
-
+export function PatchFiles<F extends PatchFile>({ patchDataStatus, patchFiles }: { patchDataStatus: PatchFetchStatus, patchFiles: FileSystem<F> }) {
     if (patchDataStatus === "not-retrieved") {
         return <></>
     }
@@ -135,27 +128,27 @@ export function PatchFiles({ list, pathSegments }: { list: PatchList, pathSegmen
         return <pre>An error occurred.</pre>;
     }
 
-    const files = list === "game" ? patchDataGameFiles : patchDataLauncherFiles;
-    return <PatchFilesSuccess files={files} pathSegments={pathSegments} />;
+    return <PatchFilesSuccess files={patchFiles} />;
 }
 
 export function Index() {
-    const patchDataStatus = useAppSelector(state => state.patchData.status);
-    const patchDataLauncherFiles = useAppSelector(state => state.patchData.launcherFiles);
-    const patchDataGameFiles = useAppSelector(state => state.patchData.gameFiles);
+    const launcherDataStatus = useAppSelector(state => state.launcherData.status);
+    const launcherFiles = useAppSelector(state => state.launcherData.files);
+    const gameDataStatus = useAppSelector(state => state.gameData.status);
+    const gameFiles = useAppSelector(state => state.gameData.files);
 
-    const launcherSize = getFileSystemSize(patchDataLauncherFiles);
-    const gameSize = getFileSystemSize(patchDataGameFiles);
+    const launcherSize = useMemo(() => getFileSystemSize(launcherFiles), [launcherFiles]);
+    const gameSize = useMemo(() => getFileSystemSize(gameFiles), [gameFiles]);
 
-    if (patchDataStatus === "not-retrieved") {
+    if ([launcherDataStatus, gameDataStatus].every(s => s === "not-retrieved")) {
         return <></>
     }
 
-    if (patchDataStatus === "updating") {
+    if ([launcherDataStatus, gameDataStatus].every(s => s === "updating")) {
         return <pre>Loading...</pre>
     }
 
-    if (patchDataStatus === "error") {
+    if ([launcherDataStatus, gameDataStatus].every(s => s === "error")) {
         return <pre>An error occurred.</pre>;
     }
 
@@ -164,12 +157,12 @@ export function Index() {
             <tbody>
                 <tr>
                     <td><Link to="/launcher">launcher</Link></td>
-                    <td>{parseSize(launcherSize)}</td>
+                    <td>{launcherDataStatus === "updated" ? parseSize(launcherSize) : "Loading..."}</td>
                     <td></td>
                 </tr>
                 <tr>
                     <td><Link to="/game">game</Link></td>
-                    <td>{parseSize(gameSize)}</td>
+                    <td>{gameDataStatus === "updated" ? parseSize(gameSize) : "Loading..."}</td>
                     <td></td>
                 </tr>
             </tbody>

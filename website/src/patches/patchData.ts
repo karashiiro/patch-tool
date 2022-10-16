@@ -1,8 +1,8 @@
 import {createAsyncThunk, createSlice} from "@reduxjs/toolkit";
 
-type PatchLocation = "m" | "p";
+export type PatchLocation = "m" | "p";
 
-type PatchFetchStatus = "error" | "not-retrieved" | "updating" | "updated";
+export type PatchFetchStatus = "error" | "not-retrieved" | "updating" | "updated";
 
 export type FileEntry<F> = { type: "F", value: F };
 
@@ -27,8 +27,6 @@ export interface GamePatchFile extends PatchFile {
 }
 
 interface PatchData {
-    launcherFiles: FileSystem<LauncherPatchFile>;
-    gameFiles: FileSystem<GamePatchFile>;
     repositories: {
         master?: string;
         patch?: string;
@@ -38,11 +36,12 @@ interface PatchData {
     status: PatchFetchStatus;
 }
 
-const initialState: PatchData = {
-    launcherFiles: [],
-    gameFiles: [],
-    repositories: {},
-    status: "not-retrieved",
+type LauncherPatchData = PatchData & {
+    files: FileSystem<LauncherPatchFile>;
+};
+
+type GamePatchData = PatchData & {
+    files: FileSystem<GamePatchFile>;
 };
 
 export const isDirectoryEntry = <F> (e: FileSystemEntry<F>): e is DirectoryEntry<F> => {
@@ -228,17 +227,6 @@ export const getFileSystemSize = <F extends PatchFile> (fs: FileSystem<F>): numb
     }, 0);
 };
 
-export const filterFileSystemBySegments = <F extends PatchFile> (fs: FileSystem<F>, pathSegments: string[]): FileSystem<F> => {
-    if (fs.length === 0 || pathSegments.length === 0) {
-        return fs;
-    }
-
-    const newPathSegments = pathSegments.slice();
-    const path = newPathSegments.shift();
-    const dir = fs.filter(isDirectoryEntry).find(e => e.path === path);
-    return filterFileSystemBySegments(dir?.value ?? [], newPathSegments);
-};
-
 const sortFileSystemDir = <F extends PatchFile> (a: FileSystemEntry<F>, b:FileSystemEntry<F>) => {
     if (isDirectoryEntry(a) && isFileEntry(b)) {
         return -1;
@@ -309,7 +297,7 @@ const fetchGamePatchFiles = async (patchUrl: string, backupPatchUrl: string): Pr
     return classic;
 };
 
-export const fetchPatchData = createAsyncThunk("patchData/fetch", async () => {
+export const fetchLauncherPatchData = createAsyncThunk("launcherData/fetch", async () => {
     const res = await fetchAqua("http://patch01.pso2gs.net/patch_prod/patches/management_beta.txt");
     const data = await res.text();
     const dataParsed = parseManagementIni(data);
@@ -319,38 +307,85 @@ export const fetchPatchData = createAsyncThunk("patchData/fetch", async () => {
         masterBackup: dataParsed["BackupMasterURL"],
         patchBackup: dataParsed["BackupPatchURL"],
     };
-    const launcherFilesPromise = fetchLauncherPatchFiles(config.patch, config.patchBackup);
-    const gameFilesPromise = fetchGamePatchFiles(config.patch, config.patchBackup);
-    const [launcherFiles, gameFiles] = await Promise.all([launcherFilesPromise, gameFilesPromise])
+    const launcherFiles = await fetchLauncherPatchFiles(config.patch, config.patchBackup);
     sortFileSystem(launcherFiles);
-    sortFileSystem(gameFiles);
     return {
         launcherFiles,
+        config,
+    };
+});
+
+export const fetchGamePatchData = createAsyncThunk("gameData/fetch", async () => {
+    const res = await fetchAqua("http://patch01.pso2gs.net/patch_prod/patches/management_beta.txt");
+    const data = await res.text();
+    const dataParsed = parseManagementIni(data);
+    const config = {
+        master: dataParsed["MasterURL"],
+        patch: dataParsed["PatchURL"],
+        masterBackup: dataParsed["BackupMasterURL"],
+        patchBackup: dataParsed["BackupPatchURL"],
+    };
+    const gameFiles = await fetchGamePatchFiles(config.patch, config.patchBackup);
+    sortFileSystem(gameFiles);
+    return {
         gameFiles,
         config,
     };
 });
 
-const patchDataSlice = createSlice({
-    name: "patches",
-    initialState,
+const launcherDataInitialState: LauncherPatchData = {
+    files: [],
+    repositories: {},
+    status: "not-retrieved",
+};
+
+const gameDataInitialState: GamePatchData = {
+    files: [],
+    repositories: {},
+    status: "not-retrieved",
+};
+
+const launcherDataSlice = createSlice({
+    name: "launcherData",
+    initialState: launcherDataInitialState,
     reducers: {},
     extraReducers: (builder) => {
         builder
-            .addCase(fetchPatchData.pending, (state) => {
+            .addCase(fetchLauncherPatchData.pending, (state) => {
                 state.status = "updating";
             })
-            .addCase(fetchPatchData.fulfilled, (state, action) => {
+            .addCase(fetchLauncherPatchData.fulfilled, (state, action) => {
                 state.status = "updated";
-                state.launcherFiles = action.payload.launcherFiles;
-                state.gameFiles = action.payload.gameFiles;
+                state.files = action.payload.launcherFiles;
                 state.repositories = action.payload.config;
             })
-            .addCase(fetchPatchData.rejected, (state, action) => {
+            .addCase(fetchLauncherPatchData.rejected, (state, action) => {
                 state.status = "error";
                 console.error(action.error);
             });
     },
 });
 
-export const {reducer} = patchDataSlice;
+const gameDataSlice = createSlice({
+    name: "gameData",
+    initialState: gameDataInitialState,
+    reducers: {},
+    extraReducers: (builder) => {
+        builder
+            .addCase(fetchGamePatchData.pending, (state) => {
+                state.status = "updating";
+            })
+            .addCase(fetchGamePatchData.fulfilled, (state, action) => {
+                state.status = "updated";
+                state.files = action.payload.gameFiles;
+                state.repositories = action.payload.config;
+            })
+            .addCase(fetchGamePatchData.rejected, (state, action) => {
+                state.status = "error";
+                console.error(action.error);
+            });
+    },
+});
+
+export const {reducer: launcherDataReducer} = launcherDataSlice;
+export const {reducer: gameDataReducer} = gameDataSlice;
