@@ -1,2 +1,2 @@
 # patch-tool
-Simple patch file viewer for PSO2.
+(WIP) Simple patch file viewer for PSO2.
