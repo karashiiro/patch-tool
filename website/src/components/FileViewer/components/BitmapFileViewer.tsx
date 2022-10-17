@@ -17,7 +17,7 @@ export default function BitmapFileViewer({ data }: { data: Blob }) {
     }, [data, objectUrl]);
 
     if (objectUrl == null) {
-        return <></>;
+        return <p>Loading</p>;
     }
 
     return <img src={objectUrl} alt="Bitmap file" />;

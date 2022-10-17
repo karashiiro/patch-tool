@@ -11,7 +11,7 @@ export default function TextFileViewer({ data }: { data: Blob }) {
     }, [readDataText]);
 
     if (dataStr == null) {
-        return <></>;
+        return <p>Loading...</p>;
     }
 
     return <pre>{dataStr}</pre>;

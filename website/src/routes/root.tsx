@@ -79,19 +79,19 @@ function ViewFileOk<F extends GamePatchFile | LauncherPatchFile>({
     }, [fetchFile]);
 
     if (fileData == null) {
-        return <></>;
+        return <p>File not found.</p>;
     }
 
     if (fileData.value.size > 1024 * 1024 * 128) {
-        return <pre>The file is too large to proxy.</pre>;
+        return <p>The file is too large to proxy.</p>;
     }
 
     if (requestFailed) {
-        return <pre>An error occurred.</pre>;
+        return <p>An error occurred.</p>;
     }
 
     if (fileClean == null || fileExt == null || data == null) {
-        return <></>;
+        return <p>Loading...</p>;
     }
 
     return (
