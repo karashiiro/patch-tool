@@ -112,6 +112,12 @@ const createFileSystemDirectoriesMemo = <F extends PatchFile> (): FileSystemDire
     return new Map<FileSystem<F>, FileSystemDirectories<F>>()
 };
 
+const setDirectoryEntryPredicate = <F extends PatchFile> (m: Map<string, DirectoryEntry<F>>) => {
+    return (e: DirectoryEntry<F>) => {
+        m.set(e.path, e);
+    };
+};
+
 export const getDirectoryEntries = <F extends PatchFile> (fs: FileSystem<F>, memo = createFileSystemDirectoriesMemo<F>()): FileSystemDirectories<F> => {
     // This is memoized because it repeatedly gets called with the same object
     // for fs1 in mergeFileSystems.
@@ -121,18 +127,10 @@ export const getDirectoryEntries = <F extends PatchFile> (fs: FileSystem<F>, mem
     }
 
     const agg: Map<string, DirectoryEntry<F>> = new Map();
-    for (const entry of fs) {
-        if (isDirectoryEntry(entry)) {
-            agg.set(entry.path, entry);
-        }
-    }
+    fs.filter(isDirectoryEntry).forEach(setDirectoryEntryPredicate(agg));
 
     memo.set(fs, agg);
     return agg;
-};
-
-const areArraysEqual = <T> (s1: T[], s2: T[]) => {
-    return s1.length === s2.length && s1.every((x) => s2.includes(x));
 };
 
 /**
@@ -141,40 +139,28 @@ const areArraysEqual = <T> (s1: T[], s2: T[]) => {
  * @param fs2 The second filesystem. This will be unmodified after the operation.
  */
 const mergeFileSystems = <F extends PatchFile> (fs1: FileSystem<F>, fs2: FileSystem<F>, memo = createFileSystemDirectoriesMemo<F>()) => {
-    const directories1 = getDirectoryEntries(fs1, memo);
     const directories2 = getDirectoryEntries(fs2, memo);
-    const dirSet1 = [...directories1.keys()];
-    const dirSet2 = [...directories2.keys()];
-    if (areArraysEqual(dirSet1, dirSet2) && fs2.filter(isFileEntry).length === 0) {
-        // Fast path for the top level of fs2 being a subset of fs1
-        directories2.forEach((entry, path) => {
-            const existingEntry = directories1.get(path);
-            if (existingEntry == null) {
-                throw new Error("Merge directory entry is missing!")
-            }
 
-            // This directory needs to be merged, push its contents
-            existingEntry.value.push(...entry.value);
-        });
-    } else {
-        for (const entry of fs2) {
-            if (isDirectoryEntry(entry)) {
-                // Check if we've already looked at a directory with the same name
-                // and merge the existing one with the current one, if possible
-                const existingEntry = directories1.get(entry.path);
-                if (existingEntry != null) {
-                    mergeFileSystems(existingEntry.value, entry.value);
-                } else {
-                    // This directory is new, push it
-                    directories1.set(entry.path, entry);
-                    fs1.push(entry);
-                }
-            } else {
-                // This is just a file, push it
-                fs1.push(entry);
-            }
-        }
+    // Push all files into fs1
+    fs1.push(...fs2.filter(isFileEntry));
+
+    if (directories2.size === 0) {
+        return;
     }
+
+    const directories1 = getDirectoryEntries(fs1, memo);
+    directories2.forEach(entry => {
+        // Check if we've already looked at a directory with the same name
+        // and merge the existing one with the current one, if possible
+        const existingEntry = directories1.get(entry.path);
+        if (existingEntry != null) {
+            mergeFileSystems(existingEntry.value, entry.value);
+        } else {
+            // This directory is new, push it
+            directories1.set(entry.path, entry);
+            fs1.push(entry);
+        }
+    });
 };
 
 const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>, memo = createFileSystemDirectoriesMemo<F>()): FileSystem<F> => {
@@ -227,7 +213,7 @@ export const getFileSystemSize = <F extends PatchFile> (fs: FileSystem<F>): numb
     }, 0);
 };
 
-const sortFileSystemDir = <F extends PatchFile> (a: FileSystemEntry<F>, b:FileSystemEntry<F>) => {
+const sortFileSystemDir = <F extends PatchFile> (a: FileSystemEntry<F>, b: FileSystemEntry<F>) => {
     if (isDirectoryEntry(a) && isFileEntry(b)) {
         return -1;
     } else if (isFileEntry(a) && isDirectoryEntry(b)) {
