@@ -83,7 +83,7 @@ function ViewFileOk<F extends GamePatchFile | LauncherPatchFile>({
     }
 
     if (fileData.value.size > 1024 * 1024 * 128) {
-        return <pre>The file is too large for viewing.</pre>;
+        return <pre>The file is too large to proxy.</pre>;
     }
 
     if (requestFailed) {
