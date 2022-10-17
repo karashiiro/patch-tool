@@ -37,7 +37,7 @@ function FilesTable<F extends PatchFile>({ files, loading }: { files: FileSystem
     const columns = useMemo(() => [
         {
             Header: "Path",
-            Cell: ({ value }: { value: string }) => directories.has(value) ? <Link to={loading ? value : ""}>{value}</Link> : <>{value}</>,
+            Cell: ({ value }: { value: string }) => directories.has(value) ? <Link to={loading ? "" : value}>{value}</Link> : <>{value}</>,
             accessor: (file: FileSystemEntry<F>) => isDirectoryEntry(file) ? file.path : file.value.path,
         },
         {
