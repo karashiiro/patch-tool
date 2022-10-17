@@ -224,60 +224,80 @@ function FileViewer({ ext, data }: { ext: string; data: Blob }) {
     );
 }
 
-export function ViewFile<F extends GamePatchFile | LauncherPatchFile>({
-    patchFiles,
+function ViewFileOk<F extends GamePatchFile | LauncherPatchFile>({
+    file,
+    fileData,
+    fileClean,
+    fileExt,
     pathBase,
 }: {
-    patchFiles: FileSystem<F>;
+    file: string;
+    fileData: FileEntry<F>;
+    fileClean: string;
+    fileExt: string;
     pathBase: string;
 }) {
-    const { file } = useParams();
     const repositories = useAppSelector(
         (state) => state.launcherData.repositories,
     );
 
-    const fileClean = file?.substring(0, file.lastIndexOf(".pat"));
-    const ext = fileClean?.substring(fileClean.lastIndexOf(".") + 1);
-
     const [data, setData] = useState<Blob | null>();
+    const [requestFailed, setRequestFailed] = useState(false);
 
     const fetchFile = useCallback(async () => {
-        if (file != null && repositories != null) {
-            const fileData = patchFiles
-                .filter(isFileEntry)
-                .find((f) => f.value.path === file);
+        if (repositories != null) {
             if (fileData == null) {
                 return;
             }
 
-            if (
-                "location" in fileData.value &&
-                fileData.value.location === "m"
-            ) {
-                const res = await fetchAquaWithBackup(
-                    file,
-                    `${repositories.master}${pathBase}/`,
-                    `${repositories.masterBackup}${pathBase}/`,
-                );
-                const blob = await res.blob();
-                setData(blob);
-            } else {
-                const res = await fetchAquaWithBackup(
-                    file,
-                    `${repositories.patch}${pathBase}/`,
-                    `${repositories.patchBackup}${pathBase}/`,
-                );
-                const blob = await res.blob();
-                setData(blob);
+            setData(null);
+            setRequestFailed(false);
+            try {
+                if (
+                    "location" in fileData.value &&
+                    fileData.value.location === "m"
+                ) {
+                    const res = await fetchAquaWithBackup(file, [
+                        `${repositories.master}${pathBase}/`,
+                        `${repositories.masterBackup}${pathBase}/`,
+                        `${repositories.patch}${pathBase}/`,
+                        `${repositories.patchBackup}${pathBase}/`,
+                    ]);
+                    const blob = await res.blob();
+                    setData(blob);
+                } else {
+                    const res = await fetchAquaWithBackup(file, [
+                        `${repositories.patch}${pathBase}/`,
+                        `${repositories.patchBackup}${pathBase}/`,
+                        `${repositories.master}${pathBase}/`,
+                        `${repositories.masterBackup}${pathBase}/`,
+                    ]);
+                    const blob = await res.blob();
+                    setData(blob);
+                }
+            } catch {
+                setRequestFailed(true);
             }
         }
-    }, [file, repositories, patchFiles, pathBase]);
+    }, [file, fileData, repositories, pathBase]);
 
     useEffect(() => {
         fetchFile();
     }, [fetchFile]);
 
-    if (fileClean == null || ext == null || data == null) {
+    if (fileData == null) {
+        return <></>;
+    }
+
+    if (fileData.value.size > 1024 * 1024 * 128) {
+        return <pre>The file is too large for viewing.</pre>;
+    }
+
+    if (requestFailed) {
+        return <pre>An error occurred.</pre>;
+    }
+
+    if (fileClean == null || fileExt == null || data == null) {
         return <></>;
     }
 
@@ -301,8 +321,38 @@ export function ViewFile<F extends GamePatchFile | LauncherPatchFile>({
                     Download
                 </button>
             </div>
-            <FileViewer ext={ext} data={data} />
+            <FileViewer ext={fileExt} data={data} />
         </div>
+    );
+}
+
+export function ViewFile<F extends GamePatchFile | LauncherPatchFile>({
+    patchFiles,
+    pathBase,
+}: {
+    patchFiles: FileSystem<F>;
+    pathBase: string;
+}) {
+    const { file } = useParams();
+
+    const fileClean = file?.substring(0, file.lastIndexOf(".pat"));
+    const ext = fileClean?.substring(fileClean.lastIndexOf(".") + 1);
+    const fileData = patchFiles
+        .filter(isFileEntry)
+        .find((f) => f.value.path === file);
+
+    if (file == null || fileClean == null || ext == null || fileData == null) {
+        return <></>;
+    }
+
+    return (
+        <ViewFileOk
+            file={file}
+            fileData={fileData}
+            fileClean={fileClean}
+            fileExt={ext}
+            pathBase={pathBase}
+        />
     );
 }
 

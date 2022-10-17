@@ -85,19 +85,19 @@ export const fetchAqua = async (url: string) => {
     return fetch(proxyRes.result);
 };
 
-export const fetchAquaWithBackup = async (
-    file: string,
-    url: string,
-    urlBackup: string,
-) => {
-    let res: Response;
-    try {
-        res = await fetchAqua(`${url}${file}`);
-    } catch {
-        res = await fetchAqua(`${urlBackup}${file}`);
+export const fetchAquaWithBackup = async (file: string, urls: string[]) => {
+    let error = new Error("No URLs were provided.");
+    for (const url of urls) {
+        try {
+            return await fetchAqua(`${url}${file}`);
+        } catch (err) {
+            if (err instanceof Error) {
+                error = err;
+            }
+        }
     }
 
-    return res;
+    throw error;
 };
 
 const parseManagementIni = (data: string) => {
@@ -298,11 +298,10 @@ const fetchLauncherPatchFiles = async (
     patchUrl: string,
     patchUrlBackup: string,
 ): Promise<FileSystem<LauncherPatchFile>> => {
-    const res = await fetchAquaWithBackup(
-        "launcherlist.txt",
+    const res = await fetchAquaWithBackup("launcherlist.txt", [
         patchUrl,
         patchUrlBackup,
-    );
+    ]);
     const data = await res.text();
     const files: FileEntry<LauncherPatchFile>[] = data
         .split("\n")
@@ -325,7 +324,7 @@ const fetchGameListPatchFiles = async (
     url: string,
     backupUrl: string,
 ) => {
-    const res = await fetchAquaWithBackup(file, url, backupUrl);
+    const res = await fetchAquaWithBackup(file, [url, backupUrl]);
     const data = await res.text();
     const files: FileEntry<GamePatchFile>[] = data
         .split("\n")
