@@ -1,12 +1,17 @@
 name: Node.js CI/CD
 
 on:
+  workflow_dispatch:
   push:
-    branches: [ "main" ]
-    paths: [ "website" ]
+    branches:
+      - main
+    paths:
+      - "website/**/*"
   pull_request:
-    branches: [ "main" ]
-    paths: [ "website" ]
+    branches:
+      - main
+    paths:
+      - "website/**/*"
 
 jobs:
   build:
