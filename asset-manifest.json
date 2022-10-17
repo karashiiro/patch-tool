@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/patch-tool/static/css/main.33f3bef2.css",
-    "main.js": "/patch-tool/static/js/main.f58b06fc.js",
+    "main.css": "/patch-tool/static/css/main.1a91d06b.css",
+    "main.js": "/patch-tool/static/js/main.a96123a0.js",
     "static/js/787.5592dac1.chunk.js": "/patch-tool/static/js/787.5592dac1.chunk.js",
     "index.html": "/patch-tool/index.html",
-    "main.33f3bef2.css.map": "/patch-tool/static/css/main.33f3bef2.css.map",
-    "main.f58b06fc.js.map": "/patch-tool/static/js/main.f58b06fc.js.map",
+    "main.1a91d06b.css.map": "/patch-tool/static/css/main.1a91d06b.css.map",
+    "main.a96123a0.js.map": "/patch-tool/static/js/main.a96123a0.js.map",
     "787.5592dac1.chunk.js.map": "/patch-tool/static/js/787.5592dac1.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.33f3bef2.css",
-    "static/js/main.f58b06fc.js"
+    "static/css/main.1a91d06b.css",
+    "static/js/main.a96123a0.js"
   ]
 }
