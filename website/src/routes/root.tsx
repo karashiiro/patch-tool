@@ -253,6 +253,7 @@ export function FileViewer() {
     if (viewer == null) {
         return (
             <div>
+                <h1>{fileClean}</h1>
                 <p>There is no file viewer associated with this file type.</p>
                 <p>
                     Click the download button below to download the file to your
