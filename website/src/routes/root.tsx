@@ -22,7 +22,7 @@ function parseSize(n: number) {
     return `${n}${labels[i]}`;
 }
 
-function PatchFilesSuccess<F extends PatchFile>({ files }: { files: FileSystem<F> }) {
+function FilesTable<F extends PatchFile>({ files, loading }: { files: FileSystem<F>, loading: boolean }) {
     const directorySizes = useMemo(() => {
         return files.reduce<Record<string, number>>((agg, next) => {
             if (next.type === "D") {
@@ -37,19 +37,20 @@ function PatchFilesSuccess<F extends PatchFile>({ files }: { files: FileSystem<F
     const columns = useMemo(() => [
         {
             Header: "Path",
-            Cell: ({ value }: { value: string }) => directories.has(value) ? <Link to={value}>{value}</Link> : <>{value}</>,
+            Cell: ({ value }: { value: string }) => directories.has(value) ? <Link to={loading ? value : ""}>{value}</Link> : <>{value}</>,
             accessor: (file: FileSystemEntry<F>) => isDirectoryEntry(file) ? file.path : file.value.path,
         },
         {
             Header: "File size",
-            Cell: ({ value }: { value: number }) => <>{parseSize(value)}</>,
+            Cell: ({ value }: { value: number }) => <>{loading ? "Loading..." : parseSize(value)}</>,
             accessor: (file: FileSystemEntry<F>) => isDirectoryEntry(file) ? directorySizes[file.path] : file.value.size,
         },
         {
             Header: "Fingerprint",
+            Cell: ({ value }: { value: number }) => <>{loading ? "Loading..." : value}</>,
             accessor: (file: FileSystemEntry<F>) => isDirectoryEntry(file) ? "" : file.value.fingerprint,
         },
-    ], [directorySizes, directories]);
+    ], [loading, directorySizes, directories]);
 
     const scrollBarWidth = useScrollbarWidth();
     const {width, height} = useWindowSize();
@@ -120,15 +121,11 @@ export function PatchFiles<F extends PatchFile>({ patchDataStatus, patchFiles }:
         return <></>
     }
 
-    if (patchDataStatus === "updating") {
-        return <pre>Loading...</pre>
-    }
-
     if (patchDataStatus === "error") {
         return <pre>An error occurred.</pre>;
     }
 
-    return <PatchFilesSuccess files={patchFiles} />;
+    return <FilesTable files={patchFiles} loading={patchDataStatus === "updating"} />;
 }
 
 export function Index() {
@@ -137,37 +134,20 @@ export function Index() {
     const gameDataStatus = useAppSelector(state => state.gameData.status);
     const gameFiles = useAppSelector(state => state.gameData.files);
 
-    const launcherSize = useMemo(() => getFileSystemSize(launcherFiles), [launcherFiles]);
-    const gameSize = useMemo(() => getFileSystemSize(gameFiles), [gameFiles]);
-
     if ([launcherDataStatus, gameDataStatus].every(s => s === "not-retrieved")) {
         return <></>
-    }
-
-    if ([launcherDataStatus, gameDataStatus].every(s => s === "updating")) {
-        return <pre>Loading...</pre>
     }
 
     if ([launcherDataStatus, gameDataStatus].every(s => s === "error")) {
         return <pre>An error occurred.</pre>;
     }
 
-    return (
-        <table>
-            <tbody>
-                <tr>
-                    <td><Link to="/launcher">launcher</Link></td>
-                    <td>{launcherDataStatus === "updated" ? parseSize(launcherSize) : "Loading..."}</td>
-                    <td></td>
-                </tr>
-                <tr>
-                    <td><Link to="/game">game</Link></td>
-                    <td>{gameDataStatus === "updated" ? parseSize(gameSize) : "Loading..."}</td>
-                    <td></td>
-                </tr>
-            </tbody>
-        </table>
-    );
+    const fs: FileSystem<PatchFile> = [
+        { type: "D", path: "launcher", value: launcherFiles },
+        { type: "D", path: "game", value: gameFiles },
+    ];
+
+    return <FilesTable files={fs} loading={launcherDataStatus === "updating" || gameDataStatus === "updating"} />;
 }
 
 export default function Root() {
