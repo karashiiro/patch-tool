@@ -224,7 +224,13 @@ function FileViewer({ ext, data }: { ext: string; data: Blob }) {
     );
 }
 
-export function ViewFile() {
+export function ViewFile<F extends GamePatchFile | LauncherPatchFile>({
+    patchFiles,
+    pathBase,
+}: {
+    patchFiles: FileSystem<F>;
+    pathBase: string;
+}) {
     const { file } = useParams();
     const repositories = useAppSelector(
         (state) => state.launcherData.repositories,
@@ -237,16 +243,35 @@ export function ViewFile() {
 
     const fetchFile = useCallback(async () => {
         if (file != null && repositories != null) {
-            const res = await fetchAquaWithBackup(
-                file,
-                repositories.patch,
-                repositories.patchBackup,
-            );
+            const fileData = patchFiles
+                .filter(isFileEntry)
+                .find((f) => f.value.path === file);
+            if (fileData == null) {
+                return;
+            }
 
-            const blob = await res.blob();
-            setData(blob);
+            if (
+                "location" in fileData.value &&
+                fileData.value.location === "m"
+            ) {
+                const res = await fetchAquaWithBackup(
+                    file,
+                    `${repositories.master}${pathBase}/`,
+                    `${repositories.masterBackup}${pathBase}/`,
+                );
+                const blob = await res.blob();
+                setData(blob);
+            } else {
+                const res = await fetchAquaWithBackup(
+                    file,
+                    `${repositories.patch}${pathBase}/`,
+                    `${repositories.patchBackup}${pathBase}/`,
+                );
+                const blob = await res.blob();
+                setData(blob);
+            }
         }
-    }, [file, repositories]);
+    }, [file, repositories, patchFiles, pathBase]);
 
     useEffect(() => {
         fetchFile();

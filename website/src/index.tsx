@@ -27,6 +27,8 @@ function expandRoutesDir<F extends PatchFile>(
     pathSegments: string[],
     dir: DirectoryEntry<F>,
 ): RouteObject[] {
+    const newPathSegments = [...pathSegments, dir.path];
+
     const routes: RouteObject[] = [
         {
             path: `${base}/${dir.path}`,
@@ -36,7 +38,12 @@ function expandRoutesDir<F extends PatchFile>(
         },
         {
             path: `${base}/${dir.path}/:file`,
-            element: <ViewFile />,
+            element: (
+                <ViewFile
+                    patchFiles={dir.value}
+                    pathBase={newPathSegments.join("/")}
+                />
+            ),
         },
     ];
 
@@ -45,7 +52,7 @@ function expandRoutesDir<F extends PatchFile>(
             return expandRoutesDir(
                 `${base}/${dir.path}`,
                 status,
-                [...pathSegments, dir.path],
+                newPathSegments,
                 d,
             );
         }),
@@ -121,7 +128,9 @@ function DynamicHashRouter() {
                 },
                 {
                     path: "/launcher/:file",
-                    element: <ViewFile />,
+                    element: (
+                        <ViewFile patchFiles={launcherFiles} pathBase="" />
+                    ),
                 },
                 {
                     path: "/game",
@@ -134,7 +143,7 @@ function DynamicHashRouter() {
                 },
                 {
                     path: "/game/:file",
-                    element: <ViewFile />,
+                    element: <ViewFile patchFiles={gameFiles} pathBase="" />,
                 },
                 ...launcherRoutes,
                 ...gameRoutes,
