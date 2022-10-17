@@ -6,7 +6,7 @@ import {
     RouterProvider,
 } from "react-router-dom";
 import "./index.css";
-import Root, { FileViewer, Index, PatchFiles } from "./routes/root";
+import Root, { ViewFile, Index, PatchFiles } from "./routes/root";
 import reportWebVitals from "./reportWebVitals";
 import { Provider } from "react-redux";
 import { store } from "./store";
@@ -36,7 +36,7 @@ function expandRoutesDir<F extends PatchFile>(
         },
         {
             path: `${base}/${dir.path}/:file`,
-            element: <FileViewer />,
+            element: <ViewFile />,
         },
     ];
 
@@ -121,7 +121,7 @@ function DynamicHashRouter() {
                 },
                 {
                     path: "/launcher/:file",
-                    element: <FileViewer />,
+                    element: <ViewFile />,
                 },
                 {
                     path: "/game",
@@ -134,7 +134,7 @@ function DynamicHashRouter() {
                 },
                 {
                     path: "/game/:file",
-                    element: <FileViewer />,
+                    element: <ViewFile />,
                 },
                 ...launcherRoutes,
                 ...gameRoutes,

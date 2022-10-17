@@ -19,7 +19,7 @@ import { CSSProperties, useEffect, useMemo, useState } from "react";
 import { useBlockLayout, useTable } from "react-table";
 import { useCallback } from "react";
 import { FixedSizeList } from "react-window";
-import { useEffectOnce, useScrollbarWidth, useWindowSize } from "react-use";
+import { useScrollbarWidth, useWindowSize } from "react-use";
 import { AiOutlineFolderOpen, AiOutlineFile } from "react-icons/ai";
 import download from "downloadjs";
 
@@ -209,9 +209,22 @@ function TextFileViewer({ data }: { data: Blob }) {
     return <pre>{dataStr}</pre>;
 }
 
-const fileViewers = new Map([["txt", TextFileViewer]]);
+function FileViewer({ ext, data }: { ext: string; data: Blob }) {
+    if (ext === "txt") {
+        return <TextFileViewer data={data} />;
+    }
 
-export function FileViewer() {
+    return (
+        <div>
+            <p>There is no file viewer associated with this file type.</p>
+            <p>
+                Click the download button to download the file to your system.
+            </p>
+        </div>
+    );
+}
+
+export function ViewFile() {
     const { file } = useParams();
     const repositories = useAppSelector(
         (state) => state.launcherData.repositories,
@@ -220,13 +233,7 @@ export function FileViewer() {
     const fileClean = file?.substring(0, file.lastIndexOf(".pat"));
     const ext = fileClean?.substring(fileClean.lastIndexOf(".") + 1);
 
-    const [data, setData] = useState<Blob | null>(null);
-
-    const saveFile = () => {
-        if (data != null) {
-            download(data, fileClean, "application/octet-stream");
-        }
-    };
+    const [data, setData] = useState<Blob | null>();
 
     const fetchFile = useCallback(async () => {
         if (file != null && repositories != null) {
@@ -241,27 +248,12 @@ export function FileViewer() {
         }
     }, [file, repositories]);
 
-    useEffectOnce(() => {
+    useEffect(() => {
         fetchFile();
-    });
+    }, [fetchFile]);
 
-    if (file == null || ext == null || data == null) {
+    if (fileClean == null || ext == null || data == null) {
         return <></>;
-    }
-
-    const viewer = fileViewers.get(ext);
-    if (viewer == null) {
-        return (
-            <div>
-                <h1>{fileClean}</h1>
-                <p>There is no file viewer associated with this file type.</p>
-                <p>
-                    Click the download button below to download the file to your
-                    system.
-                </p>
-                <button onClick={saveFile}>Download</button>
-            </div>
-        );
     }
 
     return (
@@ -269,11 +261,22 @@ export function FileViewer() {
             <h1>{fileClean}</h1>
             <div className="file-stuff">
                 <p className="file-stuff-item">{file}</p>
-                <button className="file-stuff-item" onClick={saveFile}>
+                <button
+                    className="file-stuff-item"
+                    onClick={() => {
+                        if (data != null) {
+                            download(
+                                data,
+                                fileClean,
+                                "application/octet-stream",
+                            );
+                        }
+                    }}
+                >
                     Download
                 </button>
             </div>
-            {viewer({ data })}
+            <FileViewer ext={ext} data={data} />
         </div>
     );
 }
