@@ -7,6 +7,7 @@ import { useBlockLayout, useTable } from 'react-table';
 import { useCallback } from 'react';
 import { FixedSizeList } from 'react-window';
 import {useScrollbarWidth, useWindowSize} from 'react-use';
+import {AiOutlineFolderOpen, AiOutlineFile} from 'react-icons/ai';
 
 function parseSize(n: number) {
     const labels = ["B", "KB", "MB", "GB"];
@@ -20,6 +21,24 @@ function parseSize(n: number) {
     }
     n = Math.floor(n * 100) / 100;
     return `${n}${labels[i]}`;
+}
+
+function DirectoryLink({ path, loading }: { path: string, loading: boolean }) {
+    return (
+        <span className="directory-link">
+            <div className="directory-icon"><AiOutlineFolderOpen /></div>
+            <span className="directory-label"><Link to={loading ? "" : path}>{path}</Link></span>
+        </span>
+    );
+}
+
+function FileLink({ path }: { path: string }) {
+    return (
+        <span className="file-link">
+            <div className="file-icon"><AiOutlineFile /></div>
+            <span className="file-label">{path}</span>
+        </span>
+    );
 }
 
 function FilesTable<F extends PatchFile>({ files, loading }: { files: FileSystem<F>, loading: boolean }) {
@@ -37,7 +56,7 @@ function FilesTable<F extends PatchFile>({ files, loading }: { files: FileSystem
     const columns = useMemo(() => [
         {
             Header: "Path",
-            Cell: ({ value }: { value: string }) => directories.has(value) ? <Link to={loading ? "" : value}>{value}</Link> : <>{value}</>,
+            Cell: ({ value }: { value: string }) => directories.has(value) ? <DirectoryLink path={value} loading={loading} /> : <FileLink path={value} />,
             accessor: (file: FileSystemEntry<F>) => isDirectoryEntry(file) ? file.path : file.value.path,
         },
         {

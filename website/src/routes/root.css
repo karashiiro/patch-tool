@@ -9,8 +9,38 @@
     display: inline-block;
 }
 
+.th {
+    font-weight: 600;
+}
+
 .th,
 .td {
     margin: 0;
     padding: 0.5rem;
+}
+
+.directory-link {
+    display: flex;
+    flex-direction: row;
+}
+
+.directory-icon {
+    margin-top: 3px;
+}
+
+.directory-label {
+    margin-left: 4px;
+}
+
+.file-link {
+    display: flex;
+    flex-direction: row;
+}
+
+.file-icon {
+    margin-top: 3px;
+}
+
+.file-label {
+    margin-left: 4px;
 }
