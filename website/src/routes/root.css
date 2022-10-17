@@ -44,3 +44,13 @@
 .file-label {
     margin-left: 4px;
 }
+
+.file-stuff {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+
+.file-stuff-item {
+    padding: 0 4px;
+}

@@ -15,11 +15,11 @@ import {
     PatchFile,
 } from "../patches/patchData";
 import { Link, Outlet, useParams } from "react-router-dom";
-import { CSSProperties, useMemo } from "react";
+import { CSSProperties, useEffect, useMemo, useState } from "react";
 import { useBlockLayout, useTable } from "react-table";
 import { useCallback } from "react";
 import { FixedSizeList } from "react-window";
-import { useScrollbarWidth, useWindowSize } from "react-use";
+import { useEffectOnce, useScrollbarWidth, useWindowSize } from "react-use";
 import { AiOutlineFolderOpen, AiOutlineFile } from "react-icons/ai";
 import download from "downloadjs";
 
@@ -192,6 +192,25 @@ function FilesTable<F extends PatchFile>({
     );
 }
 
+function TextFileViewer({ data }: { data: Blob }) {
+    const [dataStr, setDataStr] = useState<string | null>(null);
+    const readDataText = useCallback(async () => {
+        setDataStr(await data.text());
+    }, [data]);
+
+    useEffect(() => {
+        readDataText();
+    }, [readDataText]);
+
+    if (dataStr == null) {
+        return <></>;
+    }
+
+    return <pre>{dataStr}</pre>;
+}
+
+const fileViewers = new Map([["txt", TextFileViewer]]);
+
 export function FileViewer() {
     const { file } = useParams();
     const repositories = useAppSelector(
@@ -201,7 +220,15 @@ export function FileViewer() {
     const fileClean = file?.substring(0, file.lastIndexOf(".pat"));
     const ext = fileClean?.substring(fileClean.lastIndexOf(".") + 1);
 
-    const downloadFile = useCallback(async () => {
+    const [data, setData] = useState<Blob | null>(null);
+
+    const saveFile = () => {
+        if (data != null) {
+            download(data, fileClean, "application/octet-stream");
+        }
+    };
+
+    const fetchFile = useCallback(async () => {
         if (file != null && repositories != null) {
             const res = await fetchAquaWithBackup(
                 file,
@@ -209,20 +236,43 @@ export function FileViewer() {
                 repositories.patchBackup,
             );
 
-            download(await res.blob(), fileClean, "application/octet-stream");
+            const blob = await res.blob();
+            setData(blob);
         }
-    }, [file, fileClean, repositories]);
+    }, [file, repositories]);
 
-    if (file == null) {
+    useEffectOnce(() => {
+        fetchFile();
+    });
+
+    if (file == null || ext == null || data == null) {
         return <></>;
+    }
+
+    const viewer = fileViewers.get(ext);
+    if (viewer == null) {
+        return (
+            <div>
+                <p>There is no file viewer associated with this file type.</p>
+                <p>
+                    Click the download button below to download the file to your
+                    system.
+                </p>
+                <button onClick={saveFile}>Download</button>
+            </div>
+        );
     }
 
     return (
         <div>
-            <p>{fileClean}</p>
-            <p>Extension: {ext}</p>
-            <p>Click to download file</p>
-            <button onClick={downloadFile}>Download</button>
+            <h1>{fileClean}</h1>
+            <div className="file-stuff">
+                <p className="file-stuff-item">{file}</p>
+                <button className="file-stuff-item" onClick={saveFile}>
+                    Download
+                </button>
+            </div>
+            {viewer({ data })}
         </div>
     );
 }
