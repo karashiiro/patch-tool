@@ -1,8 +1,11 @@
+import PSO2ScriptFileViewer from "./components/PSO2ScriptFileViewer";
 import TextFileViewer from "./components/TextFileViewer";
 
 export default function FileViewer({ ext, data }: { ext: string; data: Blob }) {
     if (ext === "txt") {
         return <TextFileViewer data={data} />;
+    } else if (ext === "pso2") {
+        return <PSO2ScriptFileViewer data={data} />;
     }
 
     return (
