@@ -1,35 +1,63 @@
-import React, { useEffect, useMemo } from 'react';
-import ReactDOM from 'react-dom/client';
+import React, { useEffect, useMemo } from "react";
+import ReactDOM from "react-dom/client";
 import {
     createHashRouter,
     RouteObject,
     RouterProvider,
-  } from "react-router-dom";
-import './index.css';
-import Root, {Index, PatchFiles} from "./routes/root";
-import reportWebVitals from './reportWebVitals';
-import {Provider} from "react-redux";
-import {store} from "./store";
-import { useAppSelector, useAppDispatch } from './hooks';
-import { fetchLauncherPatchData, fetchGamePatchData, isDirectoryEntry, DirectoryEntry, PatchFile, FileSystem, PatchFetchStatus } from './patches/patchData';
+} from "react-router-dom";
+import "./index.css";
+import Root, { Index, PatchFiles } from "./routes/root";
+import reportWebVitals from "./reportWebVitals";
+import { Provider } from "react-redux";
+import { store } from "./store";
+import { useAppSelector, useAppDispatch } from "./hooks";
+import {
+    fetchLauncherPatchData,
+    fetchGamePatchData,
+    isDirectoryEntry,
+    DirectoryEntry,
+    PatchFile,
+    FileSystem,
+    PatchFetchStatus,
+} from "./patches/patchData";
 
-function expandRoutesDir<F extends PatchFile>(base: string, status: PatchFetchStatus, pathSegments: string[], dir: DirectoryEntry<F>): RouteObject[] {
+function expandRoutesDir<F extends PatchFile>(
+    base: string,
+    status: PatchFetchStatus,
+    pathSegments: string[],
+    dir: DirectoryEntry<F>
+): RouteObject[] {
     const innerDirs = dir.value.filter(isDirectoryEntry);
-    const routes: RouteObject[] = [{
-        path: `${base}/${dir.path}`,
-        element: <PatchFiles patchDataStatus={status} patchFiles={dir.value} />,
-    }];
+    const routes: RouteObject[] = [
+        {
+            path: `${base}/${dir.path}`,
+            element: (
+                <PatchFiles patchDataStatus={status} patchFiles={dir.value} />
+            ),
+        },
+    ];
 
-    routes.push(...innerDirs.flatMap<RouteObject>(d => {
-        return expandRoutesDir(`${base}/${dir.path}`, status, [...pathSegments, dir.path], d);
-    }));
+    routes.push(
+        ...innerDirs.flatMap<RouteObject>((d) => {
+            return expandRoutesDir(
+                `${base}/${dir.path}`,
+                status,
+                [...pathSegments, dir.path],
+                d
+            );
+        })
+    );
 
     return routes;
 }
 
-function expandRoutes<F extends PatchFile>(base: string, status: PatchFetchStatus, fs: FileSystem<F>): RouteObject[] {
+function expandRoutes<F extends PatchFile>(
+    base: string,
+    status: PatchFetchStatus,
+    fs: FileSystem<F>
+): RouteObject[] {
     const dirs = fs.filter(isDirectoryEntry);
-    const res = dirs.flatMap<RouteObject>(dir => {
+    const res = dirs.flatMap<RouteObject>((dir) => {
         return expandRoutesDir(base, status, [], dir);
     });
 
@@ -37,10 +65,12 @@ function expandRoutes<F extends PatchFile>(base: string, status: PatchFetchStatu
 }
 
 function DynamicHashRouter() {
-    const launcherDataStatus = useAppSelector(state => state.launcherData.status);
-    const launcherFiles = useAppSelector(state => state.launcherData.files);
-    const gameDataStatus = useAppSelector(state => state.gameData.status);
-    const gameFiles = useAppSelector(state => state.gameData.files);
+    const launcherDataStatus = useAppSelector(
+        (state) => state.launcherData.status
+    );
+    const launcherFiles = useAppSelector((state) => state.launcherData.files);
+    const gameDataStatus = useAppSelector((state) => state.gameData.status);
+    const gameFiles = useAppSelector((state) => state.gameData.files);
     const dispatch = useAppDispatch();
     useEffect(() => {
         if (launcherDataStatus === "not-retrieved") {
@@ -52,15 +82,26 @@ function DynamicHashRouter() {
         }
     }, [dispatch, launcherDataStatus, gameDataStatus]);
 
-    const loading = launcherDataStatus === "updating" || gameDataStatus === "updating";
+    const loading =
+        launcherDataStatus === "updating" || gameDataStatus === "updating";
 
-    const launcherRoutes = useMemo(() => expandRoutes("/launcher", launcherDataStatus, launcherFiles), [launcherDataStatus, launcherFiles]);
-    const gameRoutes = useMemo(() => expandRoutes("/game", gameDataStatus, gameFiles), [gameDataStatus, gameFiles]);
+    const launcherRoutes = useMemo(
+        () => expandRoutes("/launcher", launcherDataStatus, launcherFiles),
+        [launcherDataStatus, launcherFiles]
+    );
+    const gameRoutes = useMemo(
+        () => expandRoutes("/game", gameDataStatus, gameFiles),
+        [gameDataStatus, gameFiles]
+    );
     const router = createHashRouter([
         {
             path: "/",
             element: <Root />,
-            errorElement: loading ? <pre>Loading...</pre> : <pre>This page does not exist!</pre>,
+            errorElement: loading ? (
+                <pre>Loading...</pre>
+            ) : (
+                <pre>This page does not exist!</pre>
+            ),
             children: [
                 {
                     path: "/",
@@ -68,23 +109,33 @@ function DynamicHashRouter() {
                 },
                 {
                     path: "/launcher",
-                    element: <PatchFiles patchDataStatus={launcherDataStatus} patchFiles={launcherFiles} />,
+                    element: (
+                        <PatchFiles
+                            patchDataStatus={launcherDataStatus}
+                            patchFiles={launcherFiles}
+                        />
+                    ),
                 },
                 {
                     path: "/game",
-                    element: <PatchFiles patchDataStatus={gameDataStatus} patchFiles={gameFiles} />,
+                    element: (
+                        <PatchFiles
+                            patchDataStatus={gameDataStatus}
+                            patchFiles={gameFiles}
+                        />
+                    ),
                 },
                 ...launcherRoutes,
                 ...gameRoutes,
-            ]
-        }
+            ],
+        },
     ]);
 
     return <RouterProvider router={router} />;
 }
 
 const root = ReactDOM.createRoot(
-    document.getElementById('root') as HTMLElement
+    document.getElementById("root") as HTMLElement
 );
 root.render(
     <React.StrictMode>

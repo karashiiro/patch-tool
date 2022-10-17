@@ -1,12 +1,20 @@
-import {createAsyncThunk, createSlice} from "@reduxjs/toolkit";
+import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 
 export type PatchLocation = "m" | "p";
 
-export type PatchFetchStatus = "error" | "not-retrieved" | "updating" | "updated";
+export type PatchFetchStatus =
+    | "error"
+    | "not-retrieved"
+    | "updating"
+    | "updated";
 
-export type FileEntry<F> = { type: "F", value: F };
+export type FileEntry<F> = { type: "F"; value: F };
 
-export type DirectoryEntry<F> = { type: "D", path: string, value: Directory<F> };
+export type DirectoryEntry<F> = {
+    type: "D";
+    path: string;
+    value: Directory<F>;
+};
 
 export type FileSystemEntry<F> = DirectoryEntry<F> | FileEntry<F>;
 
@@ -44,11 +52,13 @@ type GamePatchData = PatchData & {
     files: FileSystem<GamePatchFile>;
 };
 
-export const isDirectoryEntry = <F> (e: FileSystemEntry<F>): e is DirectoryEntry<F> => {
+export const isDirectoryEntry = <F>(
+    e: FileSystemEntry<F>
+): e is DirectoryEntry<F> => {
     return e.type === "D";
 };
 
-export const isFileEntry = <F> (e: FileSystemEntry<F>): e is FileEntry<F> => {
+export const isFileEntry = <F>(e: FileSystemEntry<F>): e is FileEntry<F> => {
     return e.type === "F";
 };
 
@@ -75,7 +85,11 @@ const fetchAqua = async (url: string) => {
     return fetch(proxyRes.result);
 };
 
-const fetchAquaWithBackup = async (file: string, url: string, urlBackup: string) => {
+const fetchAquaWithBackup = async (
+    file: string,
+    url: string,
+    urlBackup: string
+) => {
     let res: Response;
     try {
         res = await fetchAqua(`${url}${file}`);
@@ -87,38 +101,60 @@ const fetchAquaWithBackup = async (file: string, url: string, urlBackup: string)
 };
 
 const parseManagementIni = (data: string) => {
-    return data.split(/\r?\n/g)
-        .map(line => line.split("="))
-        .reduce<Record<string, string>>((agg, next) => ({...agg, [next[0]]: next[1]}), {});
+    return data
+        .split(/\r?\n/g)
+        .map((line) => line.split("="))
+        .reduce<Record<string, string>>(
+            (agg, next) => ({ ...agg, [next[0]]: next[1] }),
+            {}
+        );
 };
 
-const expandFile = <F extends PatchFile> (f: FileEntry<F>): [Boolean, Directory<F>] => {
+const expandFile = <F extends PatchFile>(
+    f: FileEntry<F>
+): [Boolean, Directory<F>] => {
     const separator = f.value.path.indexOf("/");
     if (separator === -1) {
         return [false, [f]];
     }
 
     const parentDir = f.value.path.substring(0, separator);
-    const fNew: FileEntry<F> = { type: "F", value: { ...f.value, path: f.value.path.substring(separator + 1)} };
+    const fNew: FileEntry<F> = {
+        type: "F",
+        value: { ...f.value, path: f.value.path.substring(separator + 1) },
+    };
     const dir: Directory<F> = [{ type: "D", path: parentDir, value: [fNew] }];
     return [true, dir];
 };
 
-type FileSystemDirectories<F extends PatchFile> = Map<string, DirectoryEntry<F>>;
+type FileSystemDirectories<F extends PatchFile> = Map<
+    string,
+    DirectoryEntry<F>
+>;
 
-type FileSystemDirectoriesMemo<F extends PatchFile> = Map<FileSystem<F>, FileSystemDirectories<F>>;
+type FileSystemDirectoriesMemo<F extends PatchFile> = Map<
+    FileSystem<F>,
+    FileSystemDirectories<F>
+>;
 
-const createFileSystemDirectoriesMemo = <F extends PatchFile> (): FileSystemDirectoriesMemo<F> => {
-    return new Map<FileSystem<F>, FileSystemDirectories<F>>()
+const createFileSystemDirectoriesMemo = <
+    F extends PatchFile
+>(): FileSystemDirectoriesMemo<F> => {
+    return new Map<FileSystem<F>, FileSystemDirectories<F>>();
 };
 
-const setDirectoryEntryPredicate = <F extends PatchFile> (m: Map<string, DirectoryEntry<F>>) => {
+const setDirectoryEntryPredicate = <F extends PatchFile>(
+    m: Map<string, DirectoryEntry<F>>
+) => {
     return (e: DirectoryEntry<F>) => {
         m.set(e.path, e);
     };
 };
 
-export const getDirectoryEntries = <F extends PatchFile> (fs: FileSystem<F>, memo = createFileSystemDirectoriesMemo<F>()): FileSystemDirectories<F> => {
+export const getDirectoryEntries = <F extends PatchFile>(
+    fs: FileSystem<F>,
+    memo = createFileSystemDirectoriesMemo<F>()
+): FileSystemDirectories<F> => {
     // This is memoized because it repeatedly gets called with the same object
     // for fs1 in mergeFileSystems.
     const existing = memo.get(fs);
@@ -138,7 +174,11 @@ export const getDirectoryEntries = <F extends PatchFile> (fs: FileSystem<F>, mem
  * @param fs1 The first filesystem. This will contain the result of the operation.
  * @param fs2 The second filesystem. This will be unmodified after the operation.
  */
-const mergeFileSystems = <F extends PatchFile> (fs1: FileSystem<F>, fs2: FileSystem<F>, memo = createFileSystemDirectoriesMemo<F>()) => {
+const mergeFileSystems = <F extends PatchFile>(
+    fs1: FileSystem<F>,
+    fs2: FileSystem<F>,
+    memo = createFileSystemDirectoriesMemo<F>()
+) => {
     const directories2 = getDirectoryEntries(fs2, memo);
 
     // Push all files into fs1
@@ -149,7 +189,7 @@ const mergeFileSystems = <F extends PatchFile> (fs1: FileSystem<F>, fs2: FileSys
     }
 
     const directories1 = getDirectoryEntries(fs1, memo);
-    directories2.forEach(entry => {
+    directories2.forEach((entry) => {
         // Check if we've already looked at a directory with the same name
         // and merge the existing one with the current one, if possible
         const existingEntry = directories1.get(entry.path);
@@ -163,12 +203,21 @@ const mergeFileSystems = <F extends PatchFile> (fs1: FileSystem<F>, fs2: FileSys
     });
 };
 
-const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>, memo = createFileSystemDirectoriesMemo<F>()): FileSystem<F> => {
+const expandFileSystem = <F extends PatchFile>(
+    fs: FileSystem<F>,
+    memo = createFileSystemDirectoriesMemo<F>()
+): FileSystem<F> => {
     const fsResult: FileSystem<F> = [];
     for (const entry of fs) {
         // Expand directories recursively
         if (isDirectoryEntry(entry)) {
-            const fs: Directory<F> = [{ type: "D", path: entry.path, value: expandFileSystem(entry.value) }];
+            const fs: Directory<F> = [
+                {
+                    type: "D",
+                    path: entry.path,
+                    value: expandFileSystem(entry.value),
+                },
+            ];
             fsResult.push(...fs);
         } else {
             // Expand files into filesystems, and do this recursively if needed
@@ -203,7 +252,9 @@ const expandFileSystem = <F extends PatchFile> (fs: FileSystem<F>, memo = create
     return fsClean;
 };
 
-export const getFileSystemSize = <F extends PatchFile> (fs: FileSystem<F>): number => {
+export const getFileSystemSize = <F extends PatchFile>(
+    fs: FileSystem<F>
+): number => {
     return fs.reduce((agg, next) => {
         if (isDirectoryEntry(next)) {
             return agg + getFileSystemSize(next.value);
@@ -213,7 +264,10 @@ export const getFileSystemSize = <F extends PatchFile> (fs: FileSystem<F>): numb
     }, 0);
 };
 
-const sortFileSystemDir = <F extends PatchFile> (a: FileSystemEntry<F>, b: FileSystemEntry<F>) => {
+const sortFileSystemDir = <F extends PatchFile>(
+    a: FileSystemEntry<F>,
+    b: FileSystemEntry<F>
+) => {
     if (isDirectoryEntry(a) && isFileEntry(b)) {
         return -1;
     } else if (isFileEntry(a) && isDirectoryEntry(b)) {
@@ -226,11 +280,13 @@ const sortFileSystemDir = <F extends PatchFile> (a: FileSystemEntry<F>, b: FileS
         return a.value.path.localeCompare(b.value.path);
     }
 
-    throw new Error(`Invalid filesystem entry types received: ${a.type} ${b.type}`);
+    throw new Error(
+        `Invalid filesystem entry types received: ${a.type} ${b.type}`
+    );
 };
 
-const sortFileSystem = <F extends PatchFile> (fs: FileSystem<F>) => {
-    fs.sort(sortFileSystemDir)
+const sortFileSystem = <F extends PatchFile>(fs: FileSystem<F>) => {
+    fs.sort(sortFileSystemDir);
     for (const entry of fs) {
         if (isDirectoryEntry(entry)) {
             sortFileSystem(entry.value);
@@ -238,86 +294,129 @@ const sortFileSystem = <F extends PatchFile> (fs: FileSystem<F>) => {
     }
 };
 
-const fetchLauncherPatchFiles = async (patchUrl: string, patchUrlBackup: string): Promise<FileSystem<LauncherPatchFile>> => {
-    const res = await fetchAquaWithBackup("launcherlist.txt", patchUrl, patchUrlBackup);
+const fetchLauncherPatchFiles = async (
+    patchUrl: string,
+    patchUrlBackup: string
+): Promise<FileSystem<LauncherPatchFile>> => {
+    const res = await fetchAquaWithBackup(
+        "launcherlist.txt",
+        patchUrl,
+        patchUrlBackup
+    );
     const data = await res.text();
-    const files: FileEntry<LauncherPatchFile>[] = data.split("\n")
-        .filter(line => line.length > 0)
-        .map(line => line.split("\t"))
-        .map(row => ({
+    const files: FileEntry<LauncherPatchFile>[] = data
+        .split("\n")
+        .filter((line) => line.length > 0)
+        .map((line) => line.split("\t"))
+        .map((row) => ({
             path: row[0],
             size: parseInt(row[1]),
             fingerprint: row[2],
         }))
-        .map(f => ({
+        .map((f) => ({
             type: "F",
             value: f,
         }));
     return expandFileSystem(files);
 };
 
-const fetchGameListPatchFiles = async (file: string, url: string, backupUrl: string) => {
+const fetchGameListPatchFiles = async (
+    file: string,
+    url: string,
+    backupUrl: string
+) => {
     const res = await fetchAquaWithBackup(file, url, backupUrl);
     const data = await res.text();
-    const files: FileEntry<GamePatchFile>[] = data.split("\n")
-        .filter(line => line.length > 0)
-        .map(line => line.split("\t"))
-        .map<GamePatchFile>(row => ({
+    const files: FileEntry<GamePatchFile>[] = data
+        .split("\n")
+        .filter((line) => line.length > 0)
+        .map((line) => line.split("\t"))
+        .map<GamePatchFile>((row) => ({
             path: row[0],
             fingerprint: row[1],
             size: parseInt(row[2]),
             location: row[3] === "p" ? "p" : "m",
         }))
-        .map(f => ({
+        .map((f) => ({
             type: "F",
             value: f,
         }));
     return expandFileSystem(files);
 };
 
-const fetchGamePatchFiles = async (patchUrl: string, backupPatchUrl: string): Promise<FileSystem<GamePatchFile>> => {
-    const classicPromise = fetchGameListPatchFiles("patchlist_classic.txt", patchUrl, backupPatchUrl);
-    const rebootPromise = fetchGameListPatchFiles("patchlist_reboot.txt", patchUrl, backupPatchUrl);
-    const [classic, reboot] = await Promise.all([classicPromise, rebootPromise]);
+const fetchGamePatchFiles = async (
+    patchUrl: string,
+    backupPatchUrl: string
+): Promise<FileSystem<GamePatchFile>> => {
+    const classicPromise = fetchGameListPatchFiles(
+        "patchlist_classic.txt",
+        patchUrl,
+        backupPatchUrl
+    );
+    const rebootPromise = fetchGameListPatchFiles(
+        "patchlist_reboot.txt",
+        patchUrl,
+        backupPatchUrl
+    );
+    const [classic, reboot] = await Promise.all([
+        classicPromise,
+        rebootPromise,
+    ]);
     mergeFileSystems(classic, reboot);
     return classic;
 };
 
-export const fetchLauncherPatchData = createAsyncThunk("launcherData/fetch", async () => {
-    const res = await fetchAqua("http://patch01.pso2gs.net/patch_prod/patches/management_beta.txt");
-    const data = await res.text();
-    const dataParsed = parseManagementIni(data);
-    const config = {
-        master: dataParsed["MasterURL"],
-        patch: dataParsed["PatchURL"],
-        masterBackup: dataParsed["BackupMasterURL"],
-        patchBackup: dataParsed["BackupPatchURL"],
-    };
-    const launcherFiles = await fetchLauncherPatchFiles(config.patch, config.patchBackup);
-    sortFileSystem(launcherFiles);
-    return {
-        launcherFiles,
-        config,
-    };
-});
+export const fetchLauncherPatchData = createAsyncThunk(
+    "launcherData/fetch",
+    async () => {
+        const res = await fetchAqua(
+            "http://patch01.pso2gs.net/patch_prod/patches/management_beta.txt"
+        );
+        const data = await res.text();
+        const dataParsed = parseManagementIni(data);
+        const config = {
+            master: dataParsed["MasterURL"],
+            patch: dataParsed["PatchURL"],
+            masterBackup: dataParsed["BackupMasterURL"],
+            patchBackup: dataParsed["BackupPatchURL"],
+        };
+        const launcherFiles = await fetchLauncherPatchFiles(
+            config.patch,
+            config.patchBackup
+        );
+        sortFileSystem(launcherFiles);
+        return {
+            launcherFiles,
+            config,
+        };
+    }
+);
 
-export const fetchGamePatchData = createAsyncThunk("gameData/fetch", async () => {
-    const res = await fetchAqua("http://patch01.pso2gs.net/patch_prod/patches/management_beta.txt");
-    const data = await res.text();
-    const dataParsed = parseManagementIni(data);
-    const config = {
-        master: dataParsed["MasterURL"],
-        patch: dataParsed["PatchURL"],
-        masterBackup: dataParsed["BackupMasterURL"],
-        patchBackup: dataParsed["BackupPatchURL"],
-    };
-    const gameFiles = await fetchGamePatchFiles(config.patch, config.patchBackup);
-    sortFileSystem(gameFiles);
-    return {
-        gameFiles,
-        config,
-    };
-});
+export const fetchGamePatchData = createAsyncThunk(
+    "gameData/fetch",
+    async () => {
+        const res = await fetchAqua(
+            "http://patch01.pso2gs.net/patch_prod/patches/management_beta.txt"
+        );
+        const data = await res.text();
+        const dataParsed = parseManagementIni(data);
+        const config = {
+            master: dataParsed["MasterURL"],
+            patch: dataParsed["PatchURL"],
+            masterBackup: dataParsed["BackupMasterURL"],
+            patchBackup: dataParsed["BackupPatchURL"],
+        };
+        const gameFiles = await fetchGamePatchFiles(
+            config.patch,
+            config.patchBackup
+        );
+        sortFileSystem(gameFiles);
+        return {
+            gameFiles,
+            config,
+        };
+    }
+);
 
 const launcherDataInitialState: LauncherPatchData = {
     files: [],
@@ -373,5 +472,5 @@ const gameDataSlice = createSlice({
     },
 });
 
-export const {reducer: launcherDataReducer} = launcherDataSlice;
-export const {reducer: gameDataReducer} = gameDataSlice;
+export const { reducer: launcherDataReducer } = launcherDataSlice;
+export const { reducer: gameDataReducer } = gameDataSlice;
