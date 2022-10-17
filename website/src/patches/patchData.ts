@@ -35,11 +35,11 @@ export interface GamePatchFile extends PatchFile {
 }
 
 interface PatchData {
-    repositories: {
-        master?: string;
-        patch?: string;
-        masterBackup?: string;
-        patchBackup?: string;
+    repositories?: {
+        master: string;
+        patch: string;
+        masterBackup: string;
+        patchBackup: string;
     };
     status: PatchFetchStatus;
 }
@@ -53,7 +53,7 @@ type GamePatchData = PatchData & {
 };
 
 export const isDirectoryEntry = <F>(
-    e: FileSystemEntry<F>
+    e: FileSystemEntry<F>,
 ): e is DirectoryEntry<F> => {
     return e.type === "D";
 };
@@ -62,7 +62,7 @@ export const isFileEntry = <F>(e: FileSystemEntry<F>): e is FileEntry<F> => {
     return e.type === "F";
 };
 
-const fetchAqua = async (url: string) => {
+export const fetchAqua = async (url: string) => {
     if (process.env.REACT_APP_AQUA_PROXY == null) {
         throw new Error("Environment variable REACT_APP_AQUA_PROXY not set!");
     }
@@ -85,10 +85,10 @@ const fetchAqua = async (url: string) => {
     return fetch(proxyRes.result);
 };
 
-const fetchAquaWithBackup = async (
+export const fetchAquaWithBackup = async (
     file: string,
     url: string,
-    urlBackup: string
+    urlBackup: string,
 ) => {
     let res: Response;
     try {
@@ -106,12 +106,12 @@ const parseManagementIni = (data: string) => {
         .map((line) => line.split("="))
         .reduce<Record<string, string>>(
             (agg, next) => ({ ...agg, [next[0]]: next[1] }),
-            {}
+            {},
         );
 };
 
 const expandFile = <F extends PatchFile>(
-    f: FileEntry<F>
+    f: FileEntry<F>,
 ): [Boolean, Directory<F>] => {
     const separator = f.value.path.indexOf("/");
     if (separator === -1) {
@@ -138,13 +138,13 @@ type FileSystemDirectoriesMemo<F extends PatchFile> = Map<
 >;
 
 const createFileSystemDirectoriesMemo = <
-    F extends PatchFile
+    F extends PatchFile,
 >(): FileSystemDirectoriesMemo<F> => {
     return new Map<FileSystem<F>, FileSystemDirectories<F>>();
 };
 
 const setDirectoryEntryPredicate = <F extends PatchFile>(
-    m: Map<string, DirectoryEntry<F>>
+    m: Map<string, DirectoryEntry<F>>,
 ) => {
     return (e: DirectoryEntry<F>) => {
         m.set(e.path, e);
@@ -153,7 +153,7 @@ const setDirectoryEntryPredicate = <F extends PatchFile>(
 
 export const getDirectoryEntries = <F extends PatchFile>(
     fs: FileSystem<F>,
-    memo = createFileSystemDirectoriesMemo<F>()
+    memo = createFileSystemDirectoriesMemo<F>(),
 ): FileSystemDirectories<F> => {
     // This is memoized because it repeatedly gets called with the same object
     // for fs1 in mergeFileSystems.
@@ -177,7 +177,7 @@ export const getDirectoryEntries = <F extends PatchFile>(
 const mergeFileSystems = <F extends PatchFile>(
     fs1: FileSystem<F>,
     fs2: FileSystem<F>,
-    memo = createFileSystemDirectoriesMemo<F>()
+    memo = createFileSystemDirectoriesMemo<F>(),
 ) => {
     const directories2 = getDirectoryEntries(fs2, memo);
 
@@ -205,7 +205,7 @@ const mergeFileSystems = <F extends PatchFile>(
 
 const expandFileSystem = <F extends PatchFile>(
     fs: FileSystem<F>,
-    memo = createFileSystemDirectoriesMemo<F>()
+    memo = createFileSystemDirectoriesMemo<F>(),
 ): FileSystem<F> => {
     const fsResult: FileSystem<F> = [];
     for (const entry of fs) {
@@ -253,7 +253,7 @@ const expandFileSystem = <F extends PatchFile>(
 };
 
 export const getFileSystemSize = <F extends PatchFile>(
-    fs: FileSystem<F>
+    fs: FileSystem<F>,
 ): number => {
     return fs.reduce((agg, next) => {
         if (isDirectoryEntry(next)) {
@@ -266,7 +266,7 @@ export const getFileSystemSize = <F extends PatchFile>(
 
 const sortFileSystemDir = <F extends PatchFile>(
     a: FileSystemEntry<F>,
-    b: FileSystemEntry<F>
+    b: FileSystemEntry<F>,
 ) => {
     if (isDirectoryEntry(a) && isFileEntry(b)) {
         return -1;
@@ -281,7 +281,7 @@ const sortFileSystemDir = <F extends PatchFile>(
     }
 
     throw new Error(
-        `Invalid filesystem entry types received: ${a.type} ${b.type}`
+        `Invalid filesystem entry types received: ${a.type} ${b.type}`,
     );
 };
 
@@ -296,12 +296,12 @@ const sortFileSystem = <F extends PatchFile>(fs: FileSystem<F>) => {
 
 const fetchLauncherPatchFiles = async (
     patchUrl: string,
-    patchUrlBackup: string
+    patchUrlBackup: string,
 ): Promise<FileSystem<LauncherPatchFile>> => {
     const res = await fetchAquaWithBackup(
         "launcherlist.txt",
         patchUrl,
-        patchUrlBackup
+        patchUrlBackup,
     );
     const data = await res.text();
     const files: FileEntry<LauncherPatchFile>[] = data
@@ -323,7 +323,7 @@ const fetchLauncherPatchFiles = async (
 const fetchGameListPatchFiles = async (
     file: string,
     url: string,
-    backupUrl: string
+    backupUrl: string,
 ) => {
     const res = await fetchAquaWithBackup(file, url, backupUrl);
     const data = await res.text();
@@ -346,17 +346,17 @@ const fetchGameListPatchFiles = async (
 
 const fetchGamePatchFiles = async (
     patchUrl: string,
-    backupPatchUrl: string
+    backupPatchUrl: string,
 ): Promise<FileSystem<GamePatchFile>> => {
     const classicPromise = fetchGameListPatchFiles(
         "patchlist_classic.txt",
         patchUrl,
-        backupPatchUrl
+        backupPatchUrl,
     );
     const rebootPromise = fetchGameListPatchFiles(
         "patchlist_reboot.txt",
         patchUrl,
-        backupPatchUrl
+        backupPatchUrl,
     );
     const [classic, reboot] = await Promise.all([
         classicPromise,
@@ -370,7 +370,7 @@ export const fetchLauncherPatchData = createAsyncThunk(
     "launcherData/fetch",
     async () => {
         const res = await fetchAqua(
-            "http://patch01.pso2gs.net/patch_prod/patches/management_beta.txt"
+            "http://patch01.pso2gs.net/patch_prod/patches/management_beta.txt",
         );
         const data = await res.text();
         const dataParsed = parseManagementIni(data);
@@ -382,21 +382,21 @@ export const fetchLauncherPatchData = createAsyncThunk(
         };
         const launcherFiles = await fetchLauncherPatchFiles(
             config.patch,
-            config.patchBackup
+            config.patchBackup,
         );
         sortFileSystem(launcherFiles);
         return {
             launcherFiles,
             config,
         };
-    }
+    },
 );
 
 export const fetchGamePatchData = createAsyncThunk(
     "gameData/fetch",
     async () => {
         const res = await fetchAqua(
-            "http://patch01.pso2gs.net/patch_prod/patches/management_beta.txt"
+            "http://patch01.pso2gs.net/patch_prod/patches/management_beta.txt",
         );
         const data = await res.text();
         const dataParsed = parseManagementIni(data);
@@ -408,25 +408,25 @@ export const fetchGamePatchData = createAsyncThunk(
         };
         const gameFiles = await fetchGamePatchFiles(
             config.patch,
-            config.patchBackup
+            config.patchBackup,
         );
         sortFileSystem(gameFiles);
         return {
             gameFiles,
             config,
         };
-    }
+    },
 );
 
 const launcherDataInitialState: LauncherPatchData = {
     files: [],
-    repositories: {},
+    repositories: undefined,
     status: "not-retrieved",
 };
 
 const gameDataInitialState: GamePatchData = {
     files: [],
-    repositories: {},
+    repositories: undefined,
     status: "not-retrieved",
 };
 

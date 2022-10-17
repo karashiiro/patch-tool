@@ -1,21 +1,27 @@
 import "./root.css";
 import { useAppSelector } from "../hooks";
 import {
+    fetchAquaWithBackup,
+    FileEntry,
     FileSystem,
     FileSystemEntry,
+    GamePatchFile,
     getDirectoryEntries,
     getFileSystemSize,
     isDirectoryEntry,
+    isFileEntry,
+    LauncherPatchFile,
     PatchFetchStatus,
     PatchFile,
 } from "../patches/patchData";
-import { Link, Outlet } from "react-router-dom";
+import { Link, Outlet, useParams } from "react-router-dom";
 import { CSSProperties, useMemo } from "react";
 import { useBlockLayout, useTable } from "react-table";
 import { useCallback } from "react";
 import { FixedSizeList } from "react-window";
 import { useScrollbarWidth, useWindowSize } from "react-use";
 import { AiOutlineFolderOpen, AiOutlineFile } from "react-icons/ai";
+import download from "downloadjs";
 
 function parseSize(n: number) {
     const labels = ["B", "KB", "MB", "GB"];
@@ -44,13 +50,15 @@ function DirectoryLink({ path, loading }: { path: string; loading: boolean }) {
     );
 }
 
-function FileLink({ path }: { path: string }) {
+function FileLink<F extends PatchFile>({ file }: { file: FileEntry<F> }) {
     return (
         <span className="file-link">
             <div className="file-icon">
                 <AiOutlineFile />
             </div>
-            <span className="file-label">{path}</span>
+            <span className="file-label">
+                <Link to={file.value.path}>{file.value.path}</Link>
+            </span>
         </span>
     );
 }
@@ -81,7 +89,13 @@ function FilesTable<F extends PatchFile>({
                     directories.has(value) ? (
                         <DirectoryLink path={value} loading={loading} />
                     ) : (
-                        <FileLink path={value} />
+                        <FileLink
+                            file={
+                                files
+                                    .filter(isFileEntry)
+                                    .find((f) => f.value.path === value)!
+                            }
+                        />
                     ),
                 accessor: (file: FileSystemEntry<F>) =>
                     isDirectoryEntry(file) ? file.path : file.value.path,
@@ -105,7 +119,7 @@ function FilesTable<F extends PatchFile>({
                     isDirectoryEntry(file) ? "" : file.value.fingerprint,
             },
         ],
-        [loading, directorySizes, directories]
+        [files, loading, directorySizes, directories],
     );
 
     const scrollBarWidth = useScrollbarWidth();
@@ -114,7 +128,7 @@ function FilesTable<F extends PatchFile>({
     const data = useMemo(() => files, [files]);
     const defaultColumn = useMemo(
         () => ({ width: (width - (scrollBarWidth ?? 0) - 1) / 3 }),
-        [width, scrollBarWidth]
+        [width, scrollBarWidth],
     );
     const scrollBarSize = useMemo(() => scrollBarWidth ?? 0, [scrollBarWidth]);
     const {
@@ -130,7 +144,7 @@ function FilesTable<F extends PatchFile>({
             data,
             defaultColumn,
         },
-        useBlockLayout
+        useBlockLayout,
     );
     const RenderRow = useCallback(
         ({ index, style }: { index: number; style: CSSProperties }) => {
@@ -148,7 +162,7 @@ function FilesTable<F extends PatchFile>({
                 </div>
             );
         },
-        [prepareRow, rows]
+        [prepareRow, rows],
     );
 
     return (
@@ -178,7 +192,42 @@ function FilesTable<F extends PatchFile>({
     );
 }
 
-export function PatchFiles<F extends PatchFile>({
+export function FileViewer() {
+    const { file } = useParams();
+    const repositories = useAppSelector(
+        (state) => state.launcherData.repositories,
+    );
+
+    const fileClean = file?.substring(0, file.lastIndexOf(".pat"));
+    const ext = fileClean?.substring(fileClean.lastIndexOf(".") + 1);
+
+    const downloadFile = useCallback(async () => {
+        if (file != null && repositories != null) {
+            const res = await fetchAquaWithBackup(
+                file,
+                repositories.patch,
+                repositories.patchBackup,
+            );
+
+            download(await res.blob(), fileClean, "application/octet-stream");
+        }
+    }, [file, fileClean, repositories]);
+
+    if (file == null) {
+        return <></>;
+    }
+
+    return (
+        <div>
+            <p>{fileClean}</p>
+            <p>Extension: {ext}</p>
+            <p>Click to download file</p>
+            <button onClick={downloadFile}>Download</button>
+        </div>
+    );
+}
+
+export function PatchFiles<F extends GamePatchFile | LauncherPatchFile>({
     patchDataStatus,
     patchFiles,
 }: {
@@ -203,7 +252,7 @@ export function PatchFiles<F extends PatchFile>({
 
 export function Index() {
     const launcherDataStatus = useAppSelector(
-        (state) => state.launcherData.status
+        (state) => state.launcherData.status,
     );
     const launcherFiles = useAppSelector((state) => state.launcherData.files);
     const gameDataStatus = useAppSelector((state) => state.gameData.status);

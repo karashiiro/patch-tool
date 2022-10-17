@@ -6,7 +6,7 @@ import {
     RouterProvider,
 } from "react-router-dom";
 import "./index.css";
-import Root, { Index, PatchFiles } from "./routes/root";
+import Root, { FileViewer, Index, PatchFiles } from "./routes/root";
 import reportWebVitals from "./reportWebVitals";
 import { Provider } from "react-redux";
 import { store } from "./store";
@@ -25,9 +25,8 @@ function expandRoutesDir<F extends PatchFile>(
     base: string,
     status: PatchFetchStatus,
     pathSegments: string[],
-    dir: DirectoryEntry<F>
+    dir: DirectoryEntry<F>,
 ): RouteObject[] {
-    const innerDirs = dir.value.filter(isDirectoryEntry);
     const routes: RouteObject[] = [
         {
             path: `${base}/${dir.path}`,
@@ -35,17 +34,21 @@ function expandRoutesDir<F extends PatchFile>(
                 <PatchFiles patchDataStatus={status} patchFiles={dir.value} />
             ),
         },
+        {
+            path: `${base}/${dir.path}/:file`,
+            element: <FileViewer />,
+        },
     ];
 
     routes.push(
-        ...innerDirs.flatMap<RouteObject>((d) => {
+        ...dir.value.filter(isDirectoryEntry).flatMap((d) => {
             return expandRoutesDir(
                 `${base}/${dir.path}`,
                 status,
                 [...pathSegments, dir.path],
-                d
+                d,
             );
-        })
+        }),
     );
 
     return routes;
@@ -54,7 +57,7 @@ function expandRoutesDir<F extends PatchFile>(
 function expandRoutes<F extends PatchFile>(
     base: string,
     status: PatchFetchStatus,
-    fs: FileSystem<F>
+    fs: FileSystem<F>,
 ): RouteObject[] {
     const dirs = fs.filter(isDirectoryEntry);
     const res = dirs.flatMap<RouteObject>((dir) => {
@@ -66,7 +69,7 @@ function expandRoutes<F extends PatchFile>(
 
 function DynamicHashRouter() {
     const launcherDataStatus = useAppSelector(
-        (state) => state.launcherData.status
+        (state) => state.launcherData.status,
     );
     const launcherFiles = useAppSelector((state) => state.launcherData.files);
     const gameDataStatus = useAppSelector((state) => state.gameData.status);
@@ -87,11 +90,11 @@ function DynamicHashRouter() {
 
     const launcherRoutes = useMemo(
         () => expandRoutes("/launcher", launcherDataStatus, launcherFiles),
-        [launcherDataStatus, launcherFiles]
+        [launcherDataStatus, launcherFiles],
     );
     const gameRoutes = useMemo(
         () => expandRoutes("/game", gameDataStatus, gameFiles),
-        [gameDataStatus, gameFiles]
+        [gameDataStatus, gameFiles],
     );
     const router = createHashRouter([
         {
@@ -117,6 +120,10 @@ function DynamicHashRouter() {
                     ),
                 },
                 {
+                    path: "/launcher/:file",
+                    element: <FileViewer />,
+                },
+                {
                     path: "/game",
                     element: (
                         <PatchFiles
@@ -124,6 +131,10 @@ function DynamicHashRouter() {
                             patchFiles={gameFiles}
                         />
                     ),
+                },
+                {
+                    path: "/game/:file",
+                    element: <FileViewer />,
                 },
                 ...launcherRoutes,
                 ...gameRoutes,
@@ -135,14 +146,14 @@ function DynamicHashRouter() {
 }
 
 const root = ReactDOM.createRoot(
-    document.getElementById("root") as HTMLElement
+    document.getElementById("root") as HTMLElement,
 );
 root.render(
     <React.StrictMode>
         <Provider store={store}>
             <DynamicHashRouter />
         </Provider>
-    </React.StrictMode>
+    </React.StrictMode>,
 );
 
 // If you want to start measuring performance in your app, pass a function
