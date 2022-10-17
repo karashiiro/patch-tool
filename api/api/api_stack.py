@@ -18,8 +18,8 @@ class ApiStack(Stack):
             encryption=s3.BucketEncryption.S3_MANAGED,
             public_read_access=True,
             lifecycle_rules=[
-                # To ensure that new objects are received on patch days,
-                # objects are created on every request.
+                # Because we're using S3 like a cache, deleting data
+                # very quickly is perfectly fine.
                 s3.LifecycleRule(expiration=Duration.days(1)),
             ],
         )

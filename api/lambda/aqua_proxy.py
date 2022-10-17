@@ -23,14 +23,19 @@ def get_object_url(key: str) -> str:
     return f"https://{bucket_address}/{key}"
 
 
-def upload_artifact(artifact: bytes) -> str:
+def upload_artifact(artifact: bytes, key: str):
     """
-    Uploads the provided artifact to S3. The object key will be
-    returned.
+    Uploads the provided artifact to S3.
     """
-    key = str(uuid4())
     s3.put_object(Bucket=bucket, Key=key, Body=artifact)
-    return key
+
+
+def has_artifact(key: str) -> bool:
+    """
+    Returns whether or not the provided key exists in the S3 bucket.
+    """
+    keys = s3.list_objects_v2(Bucket=bucket, Prefix=key)
+    return key in keys
 
 
 def is_url_allowed(url: str) -> bool:
@@ -60,6 +65,15 @@ def cors_permissive(headers: Dict[str, str]) -> Dict[str, str]:
     any existing ones.
     """
     return {**headers, **{'Access-Control-Allow-Origin': '*'}}
+
+
+def build_aqua_headers():
+    """
+    Returns the headers required to access the Aqua patch repository,
+    """
+    return {
+        'User-Agent': 'AQUA_HTTP',
+    }
 
 
 def handler(event, context):
@@ -111,16 +125,36 @@ def handler(event, context):
     logger.info('Making request to %s://%s%s', parsed_url.scheme,
                 parsed_url.hostname, parsed_url.path)
     conn = client.HTTPConnection(parsed_url.hostname, parsed_url.port)
-    conn.request('GET', parsed_url.path, headers={
-        'User-Agent': 'AQUA_HTTP',
-    })
 
-    # Get the file from the response and upload it to S3 for
-    # a fast download time
+    # Start with a headers-only request to see if we need to download
+    # an entire file
+    conn.request('HEAD', parsed_url.path, headers=build_aqua_headers())
     res = conn.getresponse()
+
     logger.info('Response status: %d %s', res.status, res.reason)
+    logger.info('Response etag: %s', res.headers.get('Etag', ''))
+
+    object_key = res.headers.get('Etag', str(uuid4()))
+    object_key = object_key.replace('"', '')
+
+    if has_artifact(object_key):
+        return {
+            'statusCode': res.status,
+            'headers': cors_permissive(extract_headers(res)),
+            'body': json.dumps({
+                'result': get_object_url(object_key),
+            }),
+        }
+
+    # Dump anything in the response buffer
+    res.read()
+
+    # Download the full file and upload it to S3 for a faster download
+    # time in the web application
+    conn.request('GET', parsed_url.path, headers=build_aqua_headers())
+    res = conn.getresponse()
     try:
-        object_key = upload_artifact(res.read())
+        upload_artifact(res.read(), object_key)
     except Exception as e:
         logger.error(e)
         return {
