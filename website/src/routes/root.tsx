@@ -46,24 +46,26 @@ function ViewFileOk<F extends GamePatchFile | LauncherPatchFile>({
             setData(null);
             setRequestFailed(false);
             try {
+                const pathBaseClean =
+                    pathBase === "" ? pathBase : `${pathBase}/`;
                 if (
                     "location" in fileData.value &&
                     fileData.value.location === "m"
                 ) {
                     const res = await fetchAquaWithBackup(file, [
-                        `${repositories.master}${pathBase}/`,
-                        `${repositories.masterBackup}${pathBase}/`,
-                        `${repositories.patch}${pathBase}/`,
-                        `${repositories.patchBackup}${pathBase}/`,
+                        `${repositories.master}${pathBaseClean}`,
+                        `${repositories.masterBackup}${pathBaseClean}`,
+                        `${repositories.patch}${pathBaseClean}`,
+                        `${repositories.patchBackup}${pathBaseClean}`,
                     ]);
                     const blob = await res.blob();
                     setData(blob);
                 } else {
                     const res = await fetchAquaWithBackup(file, [
-                        `${repositories.patch}${pathBase}/`,
-                        `${repositories.patchBackup}${pathBase}/`,
-                        `${repositories.master}${pathBase}/`,
-                        `${repositories.masterBackup}${pathBase}/`,
+                        `${repositories.patch}${pathBaseClean}`,
+                        `${repositories.patchBackup}${pathBaseClean}`,
+                        `${repositories.master}${pathBaseClean}`,
+                        `${repositories.masterBackup}${pathBaseClean}`,
                     ]);
                     const blob = await res.blob();
                     setData(blob);
