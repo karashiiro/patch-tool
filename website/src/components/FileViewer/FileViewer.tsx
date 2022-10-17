@@ -1,3 +1,4 @@
+import BitmapFileViewer from "./components/BitmapFileViewer";
 import PSO2ScriptFileViewer from "./components/PSO2ScriptFileViewer";
 import TextFileViewer from "./components/TextFileViewer";
 
@@ -6,6 +7,8 @@ export default function FileViewer({ ext, data }: { ext: string; data: Blob }) {
         return <TextFileViewer data={data} />;
     } else if (ext === "pso2") {
         return <PSO2ScriptFileViewer data={data} />;
+    } else if (ext === "bmp") {
+        return <BitmapFileViewer data={data} />;
     }
 
     return (
