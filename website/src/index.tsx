@@ -52,12 +52,15 @@ function DynamicHashRouter() {
         }
     }, [dispatch, launcherDataStatus, gameDataStatus]);
 
+    const loading = launcherDataStatus === "updating" || gameDataStatus === "updating";
+
     const launcherRoutes = useMemo(() => expandRoutes("/launcher", launcherDataStatus, launcherFiles), [launcherDataStatus, launcherFiles]);
     const gameRoutes = useMemo(() => expandRoutes("/game", gameDataStatus, gameFiles), [gameDataStatus, gameFiles]);
     const router = createHashRouter([
         {
             path: "/",
             element: <Root />,
+            errorElement: loading ? <pre>Loading...</pre> : <pre>This page does not exist!</pre>,
             children: [
                 {
                     path: "/",
