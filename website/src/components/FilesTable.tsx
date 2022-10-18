@@ -36,7 +36,7 @@ function DirectoryLink({ path, loading }: { path: string; loading: boolean }) {
                 <AiOutlineFolderOpen />
             </div>
             <span className="directory-label">
-                <Link to={loading ? "" : path}>{path}</Link>
+                <Link to={path}>{path}</Link>
             </span>
         </span>
     );
